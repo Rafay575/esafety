@@ -1,5 +1,3 @@
-// src/types/tom-select.d.ts
-
 declare module "tom-select" {
   export type TomValue = string | number;
 
@@ -11,7 +9,6 @@ declare module "tom-select" {
 
   export interface TomSelectOptions {
     persist?: boolean;
-    // allow the 1-arg function form most code uses, but don’t block extra args
     create?: boolean | ((input: string, ...args: any[]) => any);
     maxItems?: number;
     valueField?: string;
@@ -21,15 +18,12 @@ declare module "tom-select" {
     items?: TomValue[];
     plugins?: string[] | Record<string, any>;
     onOptionAdd?: (value: TomValue, data?: TomOption) => void;
+    onDelete?: (values: string[]) => boolean | void; // used in your code
   }
 
   export default class TomSelect {
     constructor(select: string | HTMLElement, options?: Partial<TomSelectOptions>);
-
-    // Event emitter surface
     on(event: string, handler: (...args: any[]) => void): void;
-
-    // Commonly used instance API
     destroy(): void;
     clear(silent?: boolean): void;
     addItem(value: TomValue, silent?: boolean): void;
@@ -37,8 +31,6 @@ declare module "tom-select" {
     removeOption(value: TomValue): void;
     refreshOptions(triggerDropdown?: boolean): void;
     getValue(): string | string[];
-
-    // Useful instance fields
     wrapper: HTMLElement;
     options: Record<string, TomOption>;
   }
