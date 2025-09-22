@@ -10,7 +10,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["tailwind-config"],
-    // Prevent Vite from crawling tom-select's package.json "exports"/"source"
+    // Don’t let Vite crawl tom-select's "source" entries
     exclude: ["tom-select"],
   },
   plugins: [react()],
@@ -20,13 +20,12 @@ export default defineConfig({
       "tailwind-config": fileURLToPath(
         new URL("./tailwind.config.js", import.meta.url)
       ),
-      // ✅ Force compiled build instead of /src .ts files.
-      // Try ESM first; if your installed version lacks ESM, use the JS path below.
+      // ✅ Force compiled ESM bundle instead of /src/*.ts
       "tom-select": "tom-select/dist/esm/tom-select.complete.js",
-      // Fallback (uncomment if your version has no /dist/esm):
+      // If your version ever lacks ESM, switch to:
       // "tom-select": "tom-select/dist/js/tom-select.complete.js",
     },
-    // Make sure we don't accidentally prefer "source"
+    // Avoid preferring "source" which can point to TS files
     conditions: ["browser", "import", "module", "default"],
   },
 });
