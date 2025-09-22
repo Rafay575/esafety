@@ -229,9 +229,7 @@ function Main() {
                       onChange={(e) => {
                         setSubcategory(e.target.value);
                       }}
-                      options={{
-                        placeholder: "Etalase",
-                      }}
+                     
                       className="w-full"
                       multiple
                     >

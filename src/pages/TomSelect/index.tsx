@@ -51,9 +51,7 @@ function Main() {
                           onChange={(e) => {
                             setSelect(e.target.value);
                           }}
-                          options={{
-                            placeholder: "Select your favorite actors",
-                          }}
+                          
                           className="w-full"
                         >
                           <option value="1">Leonardo DiCaprio</option>
@@ -74,9 +72,7 @@ function Main() {
                           onChange={(e) => {
                             setSelect(e.target.value);
                           }}
-                          options={{
-                            placeholder: "Select your favorite actors",
-                          }}
+                       
                           className="w-full"
                         >
                           <optgroup label="American Actors">
@@ -191,9 +187,7 @@ function Main() {
                       onChange={(e) => {
                         setSelectMultiple(e.target.value);
                       }}
-                      options={{
-                        placeholder: "Select your favorite actors",
-                      }}
+                      
                       className="w-full"
                       multiple
                     >
@@ -258,7 +252,7 @@ function Main() {
                         setSelectHeader(e.target.value);
                       }}
                       options={{
-                        placeholder: "Select your favorite actors",
+                        
                         plugins: {
                           dropdown_header: {
                             title: "Actors",
