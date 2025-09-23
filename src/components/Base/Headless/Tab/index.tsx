@@ -4,6 +4,7 @@ import { Fragment, createContext, useContext } from "react";
 
 type Variant = "tabs" | "pills" | "boxed-tabs" | "link-tabs";
 
+// Only expose what Headless UI provides via render-props.
 const tabContext = createContext<{
   selected: boolean;
   disabled: boolean;
@@ -11,6 +12,7 @@ const tabContext = createContext<{
   selected: false,
   disabled: false,
 });
+
 
 const listContext = createContext<{
   variant: Variant;
@@ -31,32 +33,25 @@ function Tab({
 >) {
   const list = useContext(listContext);
   return (
-    <HeadlessTab as={Fragment}>
-      {({ selected, disabled }) => (
-        <li
-          className={twMerge([
-            "focus-visible:outline-none",
-            fullWidth && "flex-1",
-            list.variant == "tabs" && "-mb-px",
-          ])}
-          {...props}
-        >
-          <tabContext.Provider
-            value={{
-              selected: selected,
-              disabled: disabled,
-            }}
-          >
-            {typeof children === "function"
-              ? children({
-                  selected: selected,
-                  disabled: disabled,
-                })
-              : children}
-          </tabContext.Provider>
-        </li>
-      )}
-    </HeadlessTab>
+   <HeadlessTab as={Fragment}>
+  {({ selected, disabled }) => (
+    <li
+      className={twMerge([
+        "focus-visible:outline-none",
+        fullWidth && "flex-1",
+        list.variant == "tabs" && "-mb-px",
+      ])}
+      {...props}
+    >
+      <tabContext.Provider value={{ selected, disabled }}>
+        {typeof children === "function"
+          ? children({ selected, disabled }) // <-- pass both
+          : children}
+      </tabContext.Provider>
+    </li>
+  )}
+</HeadlessTab>
+
   );
 }
 
@@ -91,39 +86,28 @@ Tab.Button = <C extends React.ElementType = "a">({
 
         // Pills
         list.variant == "pills" && "rounded-md border-0",
-        list.variant == "pills" &&
-          tab.selected &&
-          "bg-primary text-white font-medium",
+        list.variant == "pills" && tab.selected && "bg-primary text-white font-medium",
 
         // Boxed tabs
-        list.variant == "boxed-tabs" &&
-          "shadow-[0px_3px_20px_#0000000b] rounded-md",
-        list.variant == "boxed-tabs" &&
-          tab.selected &&
-          "bg-primary text-white font-medium",
+        list.variant == "boxed-tabs" && "shadow-[0px_3px_20px_#0000000b] rounded-md",
+        list.variant == "boxed-tabs" && tab.selected && "bg-primary text-white font-medium",
 
         // Link tabs
-        list.variant == "link-tabs" &&
-          "border-b-2 border-transparent dark:border-transparent",
-        list.variant == "link-tabs" &&
-          tab.selected &&
-          "border-b-primary font-medium dark:border-b-primary",
+        list.variant == "link-tabs" && "border-b-2 border-transparent dark:border-transparent",
+        list.variant == "link-tabs" && tab.selected && "border-b-primary font-medium dark:border-b-primary",
 
         className,
       ])}
-      {...props}
+      {...(props as any)}
     >
       {children}
     </Component>
   );
 };
 
-Tab.Group = ({
-  children,
-  ...props
-}: ExtractProps<typeof HeadlessTab.Group>) => {
+Tab.Group = ({ children, ...props }: ExtractProps<typeof HeadlessTab.Group>) => {
   return (
-    <HeadlessTab.Group as="div" {...props}>
+    <HeadlessTab.Group as="div" {...(props as any)}>
       {children}
     </HeadlessTab.Group>
   );
@@ -134,24 +118,17 @@ Tab.List = ({
   className,
   variant = "tabs",
   ...props
-}: ExtractProps<typeof HeadlessTab.List> & {
-  variant?: Variant;
-}) => {
+}: ExtractProps<typeof HeadlessTab.List> & { variant?: Variant }) => {
   return (
-    <listContext.Provider
-      value={{
-        variant: variant,
-      }}
-    >
+    <listContext.Provider value={{ variant }}>
       <HeadlessTab.List
         as="ul"
         className={twMerge([
-          variant == "tabs" &&
-            "border-b border-slate-200 dark:border-darkmode-400",
+          variant == "tabs" && "border-b border-slate-200 dark:border-darkmode-400",
           "w-full flex",
           className,
         ])}
-        {...props}
+        {...(props as any)}
       >
         {children}
       </HeadlessTab.List>
@@ -159,23 +136,15 @@ Tab.List = ({
   );
 };
 
-Tab.Panels = ({
-  children,
-  className,
-  ...props
-}: ExtractProps<typeof HeadlessTab.Panels>) => {
+Tab.Panels = ({ children, className, ...props }: ExtractProps<typeof HeadlessTab.Panels>) => {
   return (
-    <HeadlessTab.Panels as="div" className={className} {...props}>
+    <HeadlessTab.Panels as="div" className={className} {...(props as any)}>
       {children}
     </HeadlessTab.Panels>
   );
 };
 
-Tab.Panel = ({
-  children,
-  className,
-  ...props
-}: ExtractProps<typeof HeadlessTab.Panel>) => {
+Tab.Panel = ({ children, className, ...props }: ExtractProps<typeof HeadlessTab.Panel>) => {
   return (
     <HeadlessTab.Panel as={Fragment}>
       {({ selected }) => (
@@ -190,14 +159,10 @@ Tab.Panel = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
           className={className}
-          {...props}
+          {...(props as any)}
         >
           <>
-            {typeof children === "function"
-              ? children({
-                  selected: selected,
-                })
-              : children}
+            {typeof children === "function" ? children({ selected }) : children}
           </>
         </Transition>
       )}
