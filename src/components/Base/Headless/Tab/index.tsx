@@ -7,10 +7,8 @@ type Variant = "tabs" | "pills" | "boxed-tabs" | "link-tabs";
 // Only expose what Headless UI provides via render-props.
 const tabContext = createContext<{
   selected: boolean;
-  disabled: boolean;
 }>({
   selected: false,
-  disabled: false,
 });
 
 
@@ -34,7 +32,7 @@ function Tab({
   const list = useContext(listContext);
   return (
    <HeadlessTab as={Fragment}>
-  {({ selected, disabled }) => (
+  {({ selected, }) => (
     <li
       className={twMerge([
         "focus-visible:outline-none",
@@ -43,9 +41,9 @@ function Tab({
       ])}
       {...props}
     >
-      <tabContext.Provider value={{ selected, disabled }}>
+      <tabContext.Provider value={{ selected }}>
         {typeof children === "function"
-          ? children({ selected, disabled }) // <-- pass both
+          ? children({ selected }) // <-- pass both
           : children}
       </tabContext.Provider>
     </li>
