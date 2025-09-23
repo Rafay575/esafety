@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import  { useEffect, useMemo, useState } from "react";
 import Button from "@/components/Base/Button";
 import { FormInput, FormSelect } from "@/components/Base/Form";
 import Lucide from "@/components/Base/Lucide";
@@ -162,6 +162,51 @@ const AddUserPage: React.FC = () => {
       <form className="col-span-12 box p-6 rounded-2xl shadow-sm border border-slate-200/60 dark:border-darkmode-300 bg-gradient-to-b from-white to-slate-50 dark:from-darkmode-700 dark:to-darkmode-600" onSubmit={onSubmit}>
         <div className="grid grid-cols-12 gap-6">
           {/* Employment / IDs */}
+            <div className="col-span-12">
+            <div className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Personal</div>
+            <div className="grid grid-cols-12 gap-4">
+              <label className="col-span-12 md:col-span-4">
+                <span className="text-xs text-slate-500">Name *</span>
+                <FormInput value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g., Ayesha Khan" />
+                {errors.fullName && <p className="text-rose-500 text-xs mt-1">{errors.fullName}</p>}
+              </label>
+
+              <label className="col-span-12 md:col-span-4">
+                <span className="text-xs text-slate-500">Gender *</span>
+                <FormSelect value={gender} onChange={(e) => setGender(e.target.value)}>
+                  <option value="">Select</option>
+                  {GENDERS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </FormSelect>
+                {errors.gender && <p className="text-rose-500 text-xs mt-1">{errors.gender}</p>}
+              </label>
+
+              <label className="col-span-12 md:col-span-4">
+                <span className="text-xs text-slate-500">CNIC *</span>
+                <FormInput value={cnic} onChange={(e) => setCnic(e.target.value)} placeholder="12345-1234567-1" maxLength={15} />
+                {errors.cnic && <p className="text-rose-500 text-xs mt-1">{errors.cnic}</p>}
+              </label>
+
+
+              <label className="col-span-12 md:col-span-6">
+                <span className="text-xs text-slate-500">Phone *</span>
+                <FormInput type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" />
+                {errors.phone && <p className="text-rose-500 text-xs mt-1">{errors.phone}</p>}
+              </label>
+
+              <label className="col-span-12 md:col-span-6">
+                <span className="text-xs text-slate-500">Email *</span>
+                <FormInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+                {errors.email && <p className="text-rose-500 text-xs mt-1">{errors.email}</p>}
+              </label>
+              <label className="col-span-12">
+                <span className="text-xs text-slate-500">Address *</span>
+                <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, Area, City" className="w-full !box rounded-md p-3 min-h-[96px] text-sm" />
+                {errors.address && <p className="text-rose-500 text-xs mt-1">{errors.address}</p>}
+              </label>
+            </div>
+          </div>
           <div className="col-span-12">
             <div className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Employment</div>
             <div className="grid grid-cols-12 gap-4">
@@ -257,51 +302,7 @@ const AddUserPage: React.FC = () => {
           </div>
 
           {/* Personal */}
-          <div className="col-span-12">
-            <div className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Personal</div>
-            <div className="grid grid-cols-12 gap-4">
-              <label className="col-span-12 md:col-span-4">
-                <span className="text-xs text-slate-500">Name *</span>
-                <FormInput value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g., Ayesha Khan" />
-                {errors.fullName && <p className="text-rose-500 text-xs mt-1">{errors.fullName}</p>}
-              </label>
-
-              <label className="col-span-12 md:col-span-4">
-                <span className="text-xs text-slate-500">Gender *</span>
-                <FormSelect value={gender} onChange={(e) => setGender(e.target.value)}>
-                  <option value="">Select</option>
-                  {GENDERS.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </FormSelect>
-                {errors.gender && <p className="text-rose-500 text-xs mt-1">{errors.gender}</p>}
-              </label>
-
-              <label className="col-span-12 md:col-span-4">
-                <span className="text-xs text-slate-500">CNIC *</span>
-                <FormInput value={cnic} onChange={(e) => setCnic(e.target.value)} placeholder="12345-1234567-1" maxLength={15} />
-                {errors.cnic && <p className="text-rose-500 text-xs mt-1">{errors.cnic}</p>}
-              </label>
-
-              <label className="col-span-12">
-                <span className="text-xs text-slate-500">Address *</span>
-                <textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, Area, City" className="w-full !box rounded-md p-3 min-h-[96px] text-sm" />
-                {errors.address && <p className="text-rose-500 text-xs mt-1">{errors.address}</p>}
-              </label>
-
-              <label className="col-span-12 md:col-span-6">
-                <span className="text-xs text-slate-500">Phone *</span>
-                <FormInput type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 3xx xxxxxxx" />
-                {errors.phone && <p className="text-rose-500 text-xs mt-1">{errors.phone}</p>}
-              </label>
-
-              <label className="col-span-12 md:col-span-6">
-                <span className="text-xs text-slate-500">Email *</span>
-                <FormInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
-                {errors.email && <p className="text-rose-500 text-xs mt-1">{errors.email}</p>}
-              </label>
-            </div>
-          </div>
+        
 
           {/* Footer */}
           <div className="col-span-12 flex items-center justify-end gap-2 pt-2">
