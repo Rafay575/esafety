@@ -19,7 +19,8 @@ import PdcPtwIssue from "../pages/PdcPtw/Issue";
 import GridPreExecList from "../pages/GridPreExec";
 import GridPreExecChecklist from "../pages/GridPreExec/PreExecution";
 import PreStartList from "../pages/Execution";
- 
+import WorkInProgressPage from "../pages/WipPage";
+import WorkInProgressViewPage from "@/pages/WipPage/view";
 import PreStartForm from "../pages/Execution/prestart";
 import Layout from "../themes";
 
@@ -96,6 +97,14 @@ function Router() {
         {
           path: "/pre-start/:id",
           element: <PreStartForm />,
+        },
+        {
+          path: "/work-inprogress",
+          element: <WorkInProgressPage />,
+        },
+        {
+          path: "/work-inprogress/view",
+          element: <WorkInProgressViewPage />,
         },
         
        

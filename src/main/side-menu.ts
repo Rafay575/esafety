@@ -50,7 +50,7 @@ const menu: Array<Menu | "divider"> = [
         title: "Execution (LS & Crew)",
         subMenu: [
           { icon: "Play",       title: "Pre-Start",        pathname: "/pre-start" },   // PPE, Roster, Toolbox Talk
-          { icon: "Activity",   title: "Work In Progress", pathname: "/exec/in-progress" }, // Notes, Pause/Resume, Suspend, Extension, Incident
+          { icon: "Activity",   title: "Work In Progress", pathname: "/work-inprogress" }, // Notes, Pause/Resume, Suspend, Extension, Incident
           { icon: "CheckSquare",title: "Completion",       pathname: "/exec/completion" },  // Checklist + Evidence L3
         ],
       },
