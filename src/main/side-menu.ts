@@ -67,7 +67,7 @@ const menu: Array<Menu | "divider"> = [
     subMenu: [
       { icon: "Flag",    title: "Report Incident", pathname: "/incident-create" },
       { icon: "Search",  title: "Investigation",   pathname: "/incident-investigation" },
-      { icon: "Target",  title: "CAPA Actions",    pathname: "/capa" },
+      // { icon: "Target",  title: "CAPA Actions",    pathname: "/capa" },
     ],
   },
   {
