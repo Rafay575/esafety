@@ -51,20 +51,12 @@ const menu: Array<Menu | "divider"> = [
         subMenu: [
           { icon: "Play",       title: "Pre-Start",        pathname: "/pre-start" },   // PPE, Roster, Toolbox Talk
           { icon: "Activity",   title: "Work In Progress", pathname: "/work-inprogress" }, // Notes, Pause/Resume, Suspend, Extension, Incident
-          { icon: "CheckSquare",title: "Completion",       pathname: "/exec/completion" },  // Checklist + Evidence L3
+          { icon: "CheckSquare",title: "Completion",       pathname: "/completion" },  // Checklist + Evidence L3
         ],
       },
 
       // 7) Grid Incharge – Final Clearance
-      {
-        icon: "BadgeCheck",
-        title: "Final Clearance",
-        subMenu: [
-          { icon: "ListChecks", title: "Final Checklist", pathname: "/grid/final-clearance/checklist" },
-          { icon: "Power",      title: "Close PTW",       pathname: "/grid/final-clearance/close" },
-          { icon: "RotateCw",   title: "Return for Fixes", pathname: "/grid/final-clearance/return" },
-        ],
-      },
+    
 
       // Supporting Modules
     ],

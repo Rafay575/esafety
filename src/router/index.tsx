@@ -23,6 +23,8 @@ import WorkInProgressPage from "../pages/WipPage";
 import WorkInProgressViewPage from "@/pages/WipPage/view";
 import PreStartForm from "../pages/Execution/prestart";
 import Layout from "../themes";
+import CompletionListPage from "@/pages/completion";
+import CompletionDetailPage from "@/pages/completion/view";
 
 function Router() {
   const routes = [
@@ -105,6 +107,14 @@ function Router() {
         {
           path: "/work-inprogress/view",
           element: <WorkInProgressViewPage />,
+        },
+        {
+          path: "/completion",
+          element: <CompletionListPage />,
+        },
+        {
+          path: "/completion/:id",
+          element: <CompletionDetailPage />,
         },
         
        
