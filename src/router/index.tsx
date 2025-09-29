@@ -27,6 +27,9 @@ import CompletionListPage from "@/pages/completion";
 import CompletionDetailPage from "@/pages/completion/view";
 import IncidentCreatePage from "@/pages/IncidentCreate";
 import IncidentInvestigationPage from "@/pages/IncidentInvestigation";
+import RegionsListPage from "@/components/organization/regions";
+import RegionFormPage from "@/components/organization/regions/create-edit";
+import RegionViewPage from "@/components/organization/regions/view";
 
 function Router() {
   const routes = [
@@ -126,6 +129,14 @@ function Router() {
           path: "/incident-investigation",
           element: <IncidentInvestigationPage />,
         },
+        {
+          path: "/organization/regions",
+          element: <RegionsListPage />,
+        },
+        { path: "/organization/regions/create", element: <RegionFormPage /> },
+        { path: "/organization/regions/:id/edit", element: <RegionFormPage /> },
+        { path: "/organization/regions/:id/view", element: <RegionViewPage /> },
+
         
        
       ],

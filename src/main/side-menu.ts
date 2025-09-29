@@ -90,6 +90,20 @@ const menu: Array<Menu | "divider"> = [
   },
   
   "divider",
+   {
+    icon: "Building2",
+    title: "Organization",
+    subMenu: [
+      { icon: "Map",        title: "Regions",        pathname: "/organization/regions" },
+      { icon: "Circle",     title: "Circles",        pathname: "/organization/circles" },
+      { icon: "Layers",     title: "Divisions",      pathname: "/organization/divisions" },
+      { icon: "GitBranch",  title: "Sub-Divisions",  pathname: "/organization/subdivisions" },
+      { icon: "Zap",        title: "Feeders",        pathname: "/organization/feeders" },
+      // optional extras for later:
+      // { icon: "TreePine",   title: "Hierarchy Tree", pathname: "/organization/hierarchy" },
+      // { icon: "Building2",  title: "DG-IT Offices",   pathname: "/dg-it-offices" },
+    ],
+  },
   {
     icon: "Settings2",
     title: "Masters",
