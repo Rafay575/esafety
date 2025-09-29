@@ -65,8 +65,8 @@ const menu: Array<Menu | "divider"> = [
     icon: "AlertTriangle",
     title: "Incidents & CAPA",
     subMenu: [
-      { icon: "Flag",    title: "Report Incident", pathname: "/incidents/report" },
-      { icon: "Search",  title: "Investigation",   pathname: "/incidents/investigation" },
+      { icon: "Flag",    title: "Report Incident", pathname: "/incident-create" },
+      { icon: "Search",  title: "Investigation",   pathname: "/incident-investigation" },
       { icon: "Target",  title: "CAPA Actions",    pathname: "/capa" },
     ],
   },

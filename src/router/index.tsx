@@ -25,6 +25,8 @@ import PreStartForm from "../pages/Execution/prestart";
 import Layout from "../themes";
 import CompletionListPage from "@/pages/completion";
 import CompletionDetailPage from "@/pages/completion/view";
+import IncidentCreatePage from "@/pages/IncidentCreate";
+import IncidentInvestigationPage from "@/pages/IncidentInvestigation";
 
 function Router() {
   const routes = [
@@ -115,6 +117,14 @@ function Router() {
         {
           path: "/completion/:id",
           element: <CompletionDetailPage />,
+        },
+        {
+          path: "/incident-create",
+          element: <IncidentCreatePage />,
+        },
+        {
+          path: "/incident-investigation",
+          element: <IncidentInvestigationPage />,
         },
         
        
