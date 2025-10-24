@@ -1,6 +1,6 @@
 import { useRoutes } from "react-router-dom";
 
-import Login from "../pages/Login";
+import Login from "../pages/auth/Login";
 import Register from "../pages/Register";
 import ErrorPage from "../pages/ErrorPage";
 import DashboardOverview1 from "../pages/DashboardOverview1";
@@ -27,9 +27,13 @@ import CompletionListPage from "@/pages/completion";
 import CompletionDetailPage from "@/pages/completion/view";
 import IncidentCreatePage from "@/pages/IncidentCreate";
 import IncidentInvestigationPage from "@/pages/IncidentInvestigation";
-import RegionsListPage from "@/components/organization/regions";
+import RegionsListPage from "@/pages/organization/regions";
 import RegionFormPage from "@/components/organization/regions/create-edit";
 import RegionViewPage from "@/components/organization/regions/view";
+import CirclesListPage from "@/components/organization/circles";
+import DivisionsListPage from "@/components/organization/divisions";
+import SubDivisionsListPage from "@/components/organization/subdivisions";
+import FeedersListPage from "@/components/organization/Feeders";
 
 function Router() {
   const routes = [
@@ -132,6 +136,22 @@ function Router() {
         {
           path: "/organization/regions",
           element: <RegionsListPage />,
+        },
+        {
+          path: "/organization/circles",
+          element: <CirclesListPage />,
+        },
+        {
+          path: "/organization/divisions",
+          element: <DivisionsListPage />,
+        },
+        {
+          path: "/organization/subdivisions",
+          element: <SubDivisionsListPage />,
+        },
+        {
+          path: "/organization/feeders",
+          element: <FeedersListPage />,
         },
         { path: "/organization/regions/create", element: <RegionFormPage /> },
         { path: "/organization/regions/:id/edit", element: <RegionFormPage /> },
