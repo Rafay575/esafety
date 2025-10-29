@@ -28,11 +28,9 @@ import CompletionDetailPage from "@/pages/completion/view";
 import IncidentCreatePage from "@/pages/IncidentCreate";
 import IncidentInvestigationPage from "@/pages/IncidentInvestigation";
 import RegionsListPage from "@/pages/organization/regions";
-import RegionFormPage from "@/components/organization/regions/create-edit";
-import RegionViewPage from "@/components/organization/regions/view";
-import CirclesListPage from "@/components/organization/circles";
-import DivisionsListPage from "@/components/organization/divisions";
-import SubDivisionsListPage from "@/components/organization/subdivisions";
+import CirclesListPage from "@/pages/organization/circles";
+import DivisionsListPage from "@/pages/organization/divisions";
+import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeedersListPage from "@/components/organization/Feeders";
 
 function Router() {
@@ -153,9 +151,7 @@ function Router() {
           path: "/organization/feeders",
           element: <FeedersListPage />,
         },
-        { path: "/organization/regions/create", element: <RegionFormPage /> },
-        { path: "/organization/regions/:id/edit", element: <RegionFormPage /> },
-        { path: "/organization/regions/:id/view", element: <RegionViewPage /> },
+ 
 
         
        
