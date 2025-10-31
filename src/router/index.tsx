@@ -33,6 +33,15 @@ import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeedersListPage from "@/components/organization/Feeders";
 import FeederListPage from "@/pages/organization/feeders";
+import SituationOfLineBilingual from "@/pages/new";
+import SafetyHazardsBilingual from "@/pages/new/index1";
+import SafetyPrecautionsWizardBilingual from "@/pages/new/index2";
+import PTW_Issuer_Software from "@/pages/new/index5";
+import IssuerInstructionsAck_Software from "@/pages/new/index6";
+import LSInstructionsAckSoftware from "@/pages/new/index4";
+import CancellationRequest_Software from "@/pages/new/index7";
+import Canvas9_GridIncharge_Software from "@/pages/new/index8";
+import PTW_SingleForm_BilingualLabels from "@/pages/new/index9";
 
 function Router() {
   const routes = [
@@ -151,6 +160,42 @@ function Router() {
         {
           path: "/organization/feeders",
           element: <FeederListPage />,
+        },
+        {
+          path: "/1",
+          element: <SituationOfLineBilingual />,
+        },
+        {
+          path: "/2",
+          element: <SafetyHazardsBilingual />,
+        },
+        {
+          path: "/3",
+          element: <SafetyPrecautionsWizardBilingual />,
+        },
+        {
+          path: "/4",
+          element: <LSInstructionsAckSoftware />,
+        },
+        {
+          path: "/5",
+          element: <PTW_Issuer_Software />,
+        },
+          {
+          path: "/6",
+          element: <IssuerInstructionsAck_Software />,
+        },
+          {
+          path: "/7",
+          element: <CancellationRequest_Software />,
+        },
+          {
+          path: "/8",
+          element: <Canvas9_GridIncharge_Software />,
+        },
+          {
+          path: "/9",
+          element: <PTW_SingleForm_BilingualLabels />,
         },
  
 

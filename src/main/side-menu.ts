@@ -15,6 +15,51 @@ const menu: Array<Menu | "divider"> = [
         title: "LS – PJRA + PTW",
         pathname: "/pjra-ptw",
       },
+      {
+        icon: "ClipboardList",
+        title: "Form 1",
+        pathname: "/1",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 2" ,
+        pathname: "/2",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 3" ,
+        pathname: "/3",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 4" ,
+        pathname: "/4",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 5" ,
+        pathname: "/5",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 6" ,
+        pathname: "/6",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 7" ,
+        pathname: "/7",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 8" ,
+        pathname: "/8",
+      },
+      {
+        icon: "ClipboardList",
+        title: "Form 9" ,
+        pathname: "/9",
+      },
 
       // 2) SDO Review
       {
@@ -99,6 +144,7 @@ const menu: Array<Menu | "divider"> = [
       { icon: "Layers",     title: "Divisions",      pathname: "/organization/divisions" },
       { icon: "GitBranch",  title: "Sub-Divisions",  pathname: "/organization/subdivisions" },
       { icon: "Zap",        title: "Feeders",        pathname: "/organization/feeders" },
+      { icon: "Zap",        title: "Transformer",        pathname: "/organization/transformer" },
       // optional extras for later:
       // { icon: "TreePine",   title: "Hierarchy Tree", pathname: "/organization/hierarchy" },
       // { icon: "Building2",  title: "DG-IT Offices",   pathname: "/dg-it-offices" },
