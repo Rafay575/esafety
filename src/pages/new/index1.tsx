@@ -430,14 +430,7 @@ export default function SafetyHazardsBilingual() {
               Selected: <b>{computed.selectedOnly.length}</b> &middot; Highest risk:{" "}
               <b>{computed.overall}</b>
             </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline-secondary" onClick={clearAll}>
-                Reset / ری سیٹ
-              </Button>
-              <Button type="submit" variant="primary">
-                Save / محفوظ کریں
-              </Button>
-            </div>
+          
           </div>
         </div>
       </form>

@@ -31,7 +31,6 @@ import RegionsListPage from "@/pages/organization/regions";
 import CirclesListPage from "@/pages/organization/circles";
 import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
-import FeedersListPage from "@/components/organization/Feeders";
 import FeederListPage from "@/pages/organization/feeders";
 import SituationOfLineBilingual from "@/pages/new";
 import SafetyHazardsBilingual from "@/pages/new/index1";
