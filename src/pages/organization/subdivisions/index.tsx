@@ -39,6 +39,17 @@ export default function SubDivisionsListPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedSubDiv, setSelectedSubDiv] = useState<SubDivision | null>(null);
 
+  // --- Fetch Circles (for dropdown) ---
+  const { data: circleData, isFetching: circlesLoading } = useQuery({
+    queryKey: ["circles"],
+    queryFn: async () => {
+      const { data } = await api.get(`/api/v1/meta/circles`, {
+        params: { per_page: 9999 },
+      });
+      return data.data || [];
+    },
+  });
+
   // --- Fetch SubDivisions ---
   const { data, isFetching, isError, refetch } = useQuery({
     queryKey: ["subdivisions", page, perPage, search],
@@ -252,6 +263,11 @@ export default function SubDivisionsListPage() {
           else if (selectedSubDiv?.id)
             updateMut.mutate({ id: selectedSubDiv.id, payload });
         }}
+        circleOptions={
+          circlesLoading
+            ? []
+            : circleData?.map((c: any) => ({ id: c.id, name: c.name })) ?? []
+        }
       />
 
       {/* Delete Dialog */}

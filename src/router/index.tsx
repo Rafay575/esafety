@@ -32,6 +32,7 @@ import CirclesListPage from "@/pages/organization/circles";
 import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeedersListPage from "@/components/organization/Feeders";
+import FeederListPage from "@/pages/organization/feeders";
 
 function Router() {
   const routes = [
@@ -149,7 +150,7 @@ function Router() {
         },
         {
           path: "/organization/feeders",
-          element: <FeedersListPage />,
+          element: <FeederListPage />,
         },
  
 

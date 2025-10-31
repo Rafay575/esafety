@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Dialog } from "@/components/Base/Headless";
@@ -9,8 +7,9 @@ import { FormInput, FormSelect } from "@/components/Base/Form";
 import Lucide from "@/components/Base/Lucide";
 import { subDivisionSchema, type SubDivisionFormValues } from "./schemas";
 import type { SubDivision } from "./subdivisions";
+import { getRelatedByCircle } from "./lookups"; // 👈 added import
+import { Controller } from "react-hook-form";
 
-// --- FORM DIALOG ---
 type Mode = "create" | "edit";
 
 export function SubDivisionFormDialog(props: {
@@ -34,10 +33,16 @@ export function SubDivisionFormDialog(props: {
     circleOptions = [],
   } = props;
 
+  const [divisions, setDivisions] = useState<{ id: number; name: string }[]>([]);
+  const [loadingDivs, setLoadingDivs] = useState(false);
+
   const {
     register,
     handleSubmit,
     reset,
+    control,
+    watch,
+    setValue,
     formState: { errors, isValid, isSubmitting },
   } = useForm<SubDivisionFormValues>({
     resolver: yupResolver(subDivisionSchema),
@@ -54,6 +59,26 @@ export function SubDivisionFormDialog(props: {
     },
   });
 
+  const circleId = watch("circle_id");
+
+  // --- Fetch divisions when circle changes ---
+  useEffect(() => {
+    if (circleId) {
+      setLoadingDivs(true);
+      getRelatedByCircle(circleId)
+        .then((res) => {
+          setDivisions(res?.lists?.divisions ?? []);
+          // Reset division_id if circle changes
+          setValue("division_id", undefined as unknown as number);
+        })
+        .catch(() => setDivisions([]))
+        .finally(() => setLoadingDivs(false));
+    } else {
+      setDivisions([]);
+    }
+  }, [circleId, setValue]);
+
+  // --- Reset form when dialog opens ---
   useEffect(() => {
     if (open) {
       reset({
@@ -66,6 +91,14 @@ export function SubDivisionFormDialog(props: {
         sdivcompphno: initial?.sdivcompphno ?? "",
         description: initial?.description ?? "",
       });
+
+      // If editing and circle is prefilled, preload divisions
+      if (initial?.circle_id) {
+        setLoadingDivs(true);
+        getRelatedByCircle(initial.circle_id)
+          .then((res) => setDivisions(res?.lists?.divisions ?? []))
+          .finally(() => setLoadingDivs(false));
+      }
     }
   }, [open, initial, reset]);
 
@@ -86,15 +119,15 @@ export function SubDivisionFormDialog(props: {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* Division */}
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {/* Name */}
               <div className="md:col-span-2">
                 <label className="text-xs font-medium text-slate-500">
                   Name
                 </label>
                 <FormInput
                   {...register("name")}
-                  placeholder={"Enter Name"}
+                  placeholder="Enter Name"
                   className="mt-1"
                 />
                 {errors.name && (
@@ -106,69 +139,87 @@ export function SubDivisionFormDialog(props: {
 
               {/* Circle */}
               <div>
-                <label className="text-xs font-medium text-slate-500">
-                  Circle
-                </label>
-                <FormSelect
-                  {...register("circle_id", {
-                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
-                  })}
-                  defaultValue=""
-                  className="mt-1"
-                >
-                  <option value="">Select circle</option>
-                  {circleOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </FormSelect>
-                {errors.circle_id && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.circle_id.message}
-                  </p>
-                )}
+               <Controller
+  name="circle_id"
+  control={control}
+  rules={{ required: "Circle is required" }}
+  render={({ field }) => (
+    <div>
+      <label className="text-xs font-medium text-slate-500">
+        Circle
+      </label>
+      <FormSelect
+        {...field}
+        value={field.value ?? ""} // ensure controlled value
+        onChange={(e) => {
+          const val = e.target.value === "" ? undefined : Number(e.target.value);
+          field.onChange(val);
+        }}
+        className="mt-1"
+      >
+        <option value="">Select circle</option>
+        {circleOptions.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </FormSelect>
+      {errors.circle_id && (
+        <p className="text-xs text-red-500 mt-1">
+          {errors.circle_id.message}
+        </p>
+      )}
+    </div>
+  )}
+/>
               </div>
+
+              {/* Division (depends on Circle) */}
               <div>
-                <label className="text-xs font-medium text-slate-500">
-                  Division
-                </label>
-                <FormSelect
-                  {...register("division_id", {
-                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
-                  })}
-                  defaultValue=""
-                  className="mt-1"
-                >
-                  <option value="">Select division</option>
-                  {divisionOptions.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </FormSelect>
-                {errors.division_id && (
-                  <p className="text-xs text-red-500 mt-1">
-                    {errors.division_id.message}
-                  </p>
-                )}
+               <Controller
+  name="division_id"
+  control={control}
+  rules={{ required: "Division is required" }}
+  render={({ field }) => (
+    <div>
+      <label className="text-xs font-medium text-slate-500">
+        Division {loadingDivs && "(Loading...)"}
+      </label>
+      <FormSelect
+        {...field}
+        value={field.value ?? ""} // ensure it's controlled
+        onChange={(e) => {
+          const val = e.target.value === "" ? undefined : Number(e.target.value);
+          field.onChange(val);
+        }}
+        className="mt-1"
+        disabled={!circleId || loadingDivs}
+      >
+        <option value="">
+          {circleId ? "Select division" : "Select circle first"}
+        </option>
+        {divisions.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </FormSelect>
+      {errors.division_id && (
+        <p className="text-xs text-red-500 mt-1">
+          {errors.division_id.message}
+        </p>
+      )}
+    </div>
+  )}
+/>
               </div>
 
-              {/* Basic Fields */}
-              {[
+              {/* Other Fields */}
+              {[ 
                 { key: "code", label: "Code", placeholder: "SD001" },
-
                 { key: "sdivphno", label: "Phone", placeholder: "067-1234567" },
-                {
-                  key: "sdivmob",
-                  label: "Mobile",
-                  placeholder: "+923001234567",
-                },
-                {
-                  key: "sdivcompphno",
-                  label: "Complaint Phone",
-                  placeholder: "067-7654321",
-                },
+                { key: "sdivmob", label: "Mobile", placeholder: "+923001234567" },
+                { key: "sdivcompphno", label: "Complaint Phone", placeholder: "067-7654321" },
               ].map((f) => (
                 <div key={f.key}>
                   <label className="text-xs font-medium text-slate-500">
@@ -209,6 +260,7 @@ export function SubDivisionFormDialog(props: {
               )}
             </div>
 
+            {/* Buttons */}
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline-secondary"
@@ -235,6 +287,7 @@ export function SubDivisionFormDialog(props: {
     </Dialog>
   );
 }
+
 
 // --- VIEW DIALOG ---
 export function SubDivisionViewDialog({

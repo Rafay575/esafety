@@ -55,7 +55,7 @@ export async function updateSubDivision(
 }
 
 export async function toggleSubDivision(id: number, is_active: boolean) {
-  const { data } = await api.post(`/api/v1/meta/sub-divisions/${id}/toggle`, { is_active });
+  const { data } = await api.patch(`/api/v1/meta/sub-divisions/${id}`, { is_active });
   return data;
 }
 
