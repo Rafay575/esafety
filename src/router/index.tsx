@@ -42,6 +42,7 @@ import LSInstructionsAckSoftware from "@/pages/new/index4";
 import CancellationRequest_Software from "@/pages/new/index7";
 import Canvas9_GridIncharge_Software from "@/pages/new/index8";
 import PTW_SingleForm_BilingualLabels from "@/pages/new/index9";
+import PTW_StepperWizard from "@/pages/ptw/StepperWizard";
 
 function Router() {
   const routes = [
@@ -160,6 +161,10 @@ function Router() {
         {
           path: "/organization/feeders",
           element: <FeederListPage />,
+        },
+        {
+          path: "/ptw",
+          element: <PTW_StepperWizard />,
         },
         {
           path: "/1",

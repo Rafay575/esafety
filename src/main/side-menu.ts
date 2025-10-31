@@ -17,6 +17,11 @@ const menu: Array<Menu | "divider"> = [
       },
       {
         icon: "ClipboardList",
+        title: "PTW" ,
+        pathname: "/ptw",
+      },
+      {
+        icon: "ClipboardList",
         title: "Form 1",
         pathname: "/1",
       },
