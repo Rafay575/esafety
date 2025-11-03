@@ -31,7 +31,7 @@ const menu: Array<Menu | "divider"> = [
       { icon: "Layers",     title: "Divisions",      pathname: "/organization/divisions" },
       { icon: "GitBranch",  title: "Sub-Divisions",  pathname: "/organization/subdivisions" },
       { icon: "Zap",        title: "Feeders",        pathname: "/organization/feeders" },
-      { icon: "Zap",        title: "Transformer",        pathname: "/organization/transformer" },
+      // { icon: "Zap",        title: "Transformer",        pathname: "/organization/transformer" },
      
     ],
   },
