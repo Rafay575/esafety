@@ -1,436 +1,211 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "@/components/Base/Button";
-import { FormSelect, FormTextarea } from "@/components/Base/Form";
+import { FormTextarea } from "@/components/Base/Form";
 import FormCheck from "@/components/Base/Form/FormCheck";
-import FormLabel from "@/components/Base/Form/FormLabel";
+import { api } from "@/lib/axios";
+import { toast } from "sonner";
 
-type Item = { key: string; en: string; ur: string };
-type Group = { title: { en: string; ur: string }; items: Item[] };
+export default function HazardIdentificationChecklist({
+  id,
+  next,
+  back,
+}: {
+  id: number;
+  next: () => void;
+  back: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [checklist, setChecklist] = useState<
+    {
+      id: number;
+      title_en: string;
+      title_ur: string;
+      items: {
+        id: number;
+        label_en: string;
+        label_ur: string;
+      }[];
+    }[]
+  >([]);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [otherText, setOtherText] = useState("");
 
-// --------- Updated groups & items (compact but practical) ---------
-const GROUPS: Group[] = [
-  {
-    title: { en: "Electrical", ur: "برقی" },
-    items: [
-      { key: "electricShock", en: "Electric shock", ur: "بجلی کا جھٹکا" },
-      { key: "arcFlash", en: "Arc flash / arc blast", ur: "آرک فلیش / آرک بلاسٹ" },
-      { key: "induction", en: "Induced voltage / capacitive charge", ur: "انڈکشن / کیپیسیٹو چارج" },
-      { key: "adjacentLive", en: "Adjacent live parts", ur: "قریب زندہ حصے" },
-      { key: "undergroundCable", en: "Underground cable present", ur: "انڈر گراؤنڈ کیبل موجود" },
-    ],
-  },
-  {
-    title: { en: "Work at Height / Mechanical", ur: "اونچائی / مکینیکل" },
-    items: [
-      { key: "fallFromHeight", en: "Fall from height", ur: "اونچائی سے گرنے کا خطرہ" },
-      { key: "fallingObjects", en: "Falling tools / material", ur: "اوزار / سامان گرنے کا خطرہ" },
-      { key: "ladderScaffold", en: "Unsafe ladder / scaffold", ur: "غیر محفوظ سیڑھی / اسکیفولڈ" },
-      { key: "vehicleMovement", en: "Moving vehicles / machinery", ur: "چلتی گاڑیاں / مکینری" },
-    ],
-  },
-  {
-    title: { en: "Environment", ur: "ماحولیاتی" },
-    items: [
-      { key: "rainWet", en: "Rain / wet conditions", ur: "بارش / گیلاپن" },
-      { key: "windStorm", en: "Wind / storm", ur: "تیز ہوا / آندھی" },
-      { key: "heatSun", en: "Heat / sun exposure", ur: "گرمی / دھوپ" },
-      { key: "gasVapors", en: "Toxic / flammable gas or vapors", ur: "زہریلی / آتش گیر گیسیں" },
-      { key: "waterInPits", en: "Water in pits / manholes", ur: "حفرہ / مین ہول میں پانی" },
-      { key: "slipTrip", en: "Slip / trip hazards", ur: "پھسلنے / ٹھوکر کا خطرہ" },
-    ],
-  },
-  {
-    title: { en: "Public / Wildlife", ur: "عوام / جنگلی حیات" },
-    items: [
-      { key: "angryPublic", en: "Aggressive public / crowd", ur: "مشتعل عوام" },
-      { key: "traffic", en: "Road traffic", ur: "سڑک کی ٹریفک" },
-      { key: "animals", en: "Snakes / monkeys / bees / wild animals", ur: "سانپ، بندر، مکھیاں، جنگلی جانور" },
-    ],
-  },
-];
+  // -------- Fetch Checklist + Prefill if Exists --------
+  useEffect(() => {
+    const fetchChecklist = async () => {
+      try {
+        setLoading(true);
 
-// --------- Risk model ---------
-const SEVERITIES = [
-  { v: 1, label: "S1 – Minor" },
-  { v: 2, label: "S2 – Moderate" },
-  { v: 3, label: "S3 – Serious" },
-  { v: 4, label: "S4 – Major" },
-  { v: 5, label: "S5 – Catastrophic" },
-];
+        // Step 1: Fetch hazard checklist template
+        const res = await api.get("/api/v1/admin/checklists?type=HAZARDS");
+        const checklistData = res.data?.data ?? [];
 
-const LIKELIHOODS = [
-  { v: 1, label: "L1 – Rare" },
-  { v: 2, label: "L2 – Unlikely" },
-  { v: 3, label: "L3 – Possible" },
-  { v: 4, label: "L4 – Likely" },
-  { v: 5, label: "L5 – Frequent" },
-];
+        // Step 2: Fetch existing PTW data to prefill
+        const preview = await api.get(`/api/v1/ptw/${id}/preview`);
+        const existingAnswers = preview.data?.data?.checklists?.HAZARDS ?? [];
 
-function riskCategory(score: number) {
-  if (score >= 16) return { name: "High", cls: "bg-red-100 text-red-700 border-red-300" };
-  if (score >= 9) return { name: "Medium", cls: "bg-amber-100 text-amber-800 border-amber-300" };
-  if (score >= 4) return { name: "Low", cls: "bg-emerald-100 text-emerald-700 border-emerald-300" };
-  return { name: "Very Low", cls: "bg-slate-100 text-slate-700 border-slate-300" };
-}
+        // Step 3: Map existing answers into state
+        const prefilled: Record<number, string> = {};
+        existingAnswers.forEach(
+          (a: { id: number; value: string | null }) => {
+            if (a.value) prefilled[a.id] = a.value;
+          }
+        );
 
-export default function SafetyHazardsBilingual() {
-  // selection state
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [severity, setSeverity] = useState<Record<string, number>>({});
-  const [likelihood, setLikelihood] = useState<Record<string, number>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-
-  // custom hazards
-  const [cEn, setCEn] = useState("");
-  const [cUr, setCUr] = useState("");
-  const [custom, setCustom] = useState<Item[]>([]);
-
-  const allGroups: Group[] = useMemo(() => {
-    return [
-      ...GROUPS,
-      ...(custom.length
-        ? [{ title: { en: "Custom", ur: "حسبِ ضرورت" }, items: custom }]
-        : []),
-    ];
-  }, [custom]);
-
-  const toggle = (k: string) => setSelected((s) => ({ ...s, [k]: !s[k] }));
-  const setSev = (k: string, v: number) => setSeverity((s) => ({ ...s, [k]: v }));
-  const setLik = (k: string, v: number) => setLikelihood((s) => ({ ...s, [k]: v }));
-  const setNote = (k: string, v: string) => setNotes((s) => ({ ...s, [k]: v }));
-
-  const addCustomHazard = () => {
-    const en = cEn.trim();
-    const ur = cUr.trim();
-    if (!en) return;
-    const key = `custom_${Date.now()}`;
-    const item = { key, en, ur: ur || en };
-    setCustom((list) => [...list, item]);
-    // prime new custom with defaults
-    setSelected((s) => ({ ...s, [key]: true }));
-    setSeverity((s) => ({ ...s, [key]: 3 }));
-    setLikelihood((l) => ({ ...l, [key]: 3 }));
-    setCEn("");
-    setCUr("");
-  };
-
-  const removeCustom = (k: string) => {
-    setCustom((list) => list.filter((i) => i.key !== k));
-    setSelected(({ [k]: _, ...rest }) => rest);
-    setSeverity(({ [k]: _s, ...rest }) => rest);
-    setLikelihood(({ [k]: _l, ...rest }) => rest);
-    setNotes(({ [k]: _n, ...rest }) => rest);
-  };
-
-  const clearAll = () => {
-    setSelected({});
-    setSeverity({});
-    setLikelihood({});
-    setNotes({});
-    setCEn("");
-    setCUr("");
-    setCustom([]);
-  };
-
-  const computed = useMemo(() => {
-    // collect selected hazards with score/category
-    const entries: {
-      key: string;
-      en: string;
-      ur: string;
-      applied: boolean;
-      severity?: number;
-      likelihood?: number;
-      score?: number;
-      category?: string;
-      note?: string;
-    }[] = [];
-
-    for (const g of allGroups) {
-      for (const it of g.items) {
-        const applied = !!selected[it.key];
-        const sev = severity[it.key] ?? 3;
-        const lik = likelihood[it.key] ?? 3;
-        const score = sev * lik;
-        const cat = riskCategory(score).name;
-        entries.push({
-          key: it.key,
-          en: it.en,
-          ur: it.ur,
-          applied,
-          severity: applied ? sev : undefined,
-          likelihood: applied ? lik : undefined,
-          score: applied ? score : undefined,
-          category: applied ? cat : undefined,
-          note: notes[it.key],
-        });
+        setChecklist(checklistData);
+        setAnswers(prefilled);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load hazards or preview data");
+      } finally {
+        setLoading(false);
       }
+    };
+
+    fetchChecklist();
+  }, [id]);
+
+  // -------- Handle Answer Change --------
+  const handleAnswer = (itemId: number, value: string) => {
+    setAnswers((prev) => ({ ...prev, [itemId]: value }));
+  };
+
+  // -------- Submit Checklist --------
+  const onSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formattedAnswers = Object.entries(answers).map(([id, val]) => ({
+      checklist_item_id: Number(id),
+      value: val,
+    }));
+
+    if (formattedAnswers.length === 0) {
+      toast.error("Please answer all required hazards before submitting.");
+      return;
     }
 
-    const selectedOnly = entries.filter((e) => e.applied);
-    const maxScore = selectedOnly.reduce((m, e) => Math.max(m, e.score ?? 0), 0);
-    const overall = riskCategory(maxScore).name;
+    const payload = { answers: formattedAnswers };
+    console.log("🚀 Submitting Payload:", payload);
 
-    return { entries, selectedOnly, maxScore, overall };
-  }, [allGroups, selected, severity, likelihood, notes]);
-
-  const onSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      summary: {
-        count: computed.selectedOnly.length,
-        highestRiskScore: computed.maxScore,
-        highestRiskCategory: computed.overall,
-      },
-      hazards: computed.selectedOnly.map((h) => ({
-        key: h.key,
-        en: h.en,
-        ur: h.ur,
-        severity: h.severity,
-        likelihood: h.likelihood,
-        score: h.score,
-        category: h.category,
-        note: h.note,
-      })),
-      timestamp: new Date().toISOString(),
-    };
-    console.log("SAFETY_HAZARDS_V2:", payload);
-    alert("Saved. Check console for payload.");
+    try {
+      await api.post(`/api/v1/ptw/${id}/step3-hazards`, payload);
+      toast.success("Hazard checklist saved successfully!");
+      next();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save hazard checklist");
+    }
   };
 
+  const onReset = () => {
+    setAnswers({});
+    setOtherText("");
+  };
+
+  if (loading)
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        Loading checklist...
+      </div>
+    );
+
+  const group = checklist[0];
+  if (!group)
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        No checklist data found
+      </div>
+    );
+
+  // -------- UI --------
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-      <div className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="border-b bg-white/90 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div>
-            <h1 className="text-xl font-semibold">
-              Checklist – Safety Hazards Where PTW is Required
-            </h1>
+            <h1 className="text-xl font-semibold">{group.title_en}</h1>
             <p className="text-xs opacity-70" dir="rtl">
-              چیک لسٹ — وہ حفاظتی خطرات جہاں پی ٹی ڈبلیو درکار ہے
+              {group.title_ur}
             </p>
-          </div>
-
-          {/* Overall badge */}
-          <div className="hidden md:flex items-center gap-2 text-xs">
-            <span className="opacity-70">Overall Risk:</span>
-            <span
-              className={[
-                "rounded-full border px-2.5 py-1 font-medium",
-                riskCategory(computed.maxScore).cls,
-              ].join(" ")}
-            >
-              {computed.overall}
-            </span>
           </div>
         </div>
       </div>
 
-      <form onSubmit={onSave} className="mx-auto max-w-6xl px-6 pb-24 pt-4">
-        <div className="rounded-2xl border bg-white p-5 shadow-sm">
-          {allGroups.map((g) => (
-            <div key={g.title.en} className="mb-6">
-              <div className="mb-3 flex items-baseline justify-between">
-                <div className="text-sm font-semibold">
-                  {g.title.en}
-                  <span className="ml-2 text-xs opacity-70" dir="rtl">
-                    {g.title.ur}
-                  </span>
-                </div>
-                {/* small count hint */}
-                <div className="text-[11px] text-slate-500">
-                  {
-                    g.items.filter((it) => selected[it.key]).length
-                  }{" "}
-                  selected
-                </div>
-              </div>
+      {/* Checklist Form */}
+      <form onSubmit={onSave} className="mx-auto max-w-5xl px-6 pb-24 pt-4">
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {group.items.map((it) => {
+              const isOther = it.label_en.toLowerCase().includes("other");
+              const currentValue = answers[it.id] || "";
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {g.items.map((it) => {
-                  const applied = !!selected[it.key];
-                  const sev = severity[it.key] ?? 3;
-                  const lik = likelihood[it.key] ?? 3;
-                  const score = sev * lik;
-                  const cat = riskCategory(score);
-
-                  return (
-                    <div
-                      key={it.key}
-                      className={[
-                        "rounded-xl border p-3 transition",
-                        applied ? "border-primary/60 bg-primary/5" : "border-slate-200 hover:bg-slate-50",
-                      ].join(" ")}
-                    >
-                      <div
-                        className="flex cursor-pointer items-start gap-3"
-                        onClick={() => toggle(it.key)}
-                      >
-                        <FormCheck className="items-start">
-                          <FormCheck.Input
-                            type="checkbox"
-                            checked={applied}
-                            readOnly
-                            className="mt-0.5 pointer-events-none"
-                            aria-checked={applied}
-                            aria-label={it.en}
-                          />
-                          <FormCheck.Label className="ml-3 select-none">
-                            <div className="text-sm font-medium text-slate-800">
-                              {it.en}
-                            </div>
-                            <div className="text-xs text-slate-600 opacity-80" dir="rtl">
-                              {it.ur}
-                            </div>
-                          </FormCheck.Label>
-                        </FormCheck>
-
-                        {applied && (
-                          <span
-                            className={[
-                              "ml-auto rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                              cat.cls,
-                            ].join(" ")}
-                            title={`Risk score: ${score}`}
-                          >
-                            {cat.name}
-                          </span>
-                        )}
-                      </div>
-
-                      {applied && (
-                        <div className="mt-3 space-y-2">
-                          {/* Severity & Likelihood */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <FormLabel className="text-xs">Severity / شدت</FormLabel>
-                              <FormSelect
-                                value={sev}
-                                onChange={(e) => setSev(it.key, Number(e.target.value))}
-                              >
-                                {SEVERITIES.map((s) => (
-                                  <option key={s.v} value={s.v}>
-                                    {s.label}
-                                  </option>
-                                ))}
-                              </FormSelect>
-                            </div>
-                            <div>
-                              <FormLabel className="text-xs">Likelihood / امکان</FormLabel>
-                              <FormSelect
-                                value={lik}
-                                onChange={(e) => setLik(it.key, Number(e.target.value))}
-                              >
-                                {LIKELIHOODS.map((l) => (
-                                  <option key={l.v} value={l.v}>
-                                    {l.label}
-                                  </option>
-                                ))}
-                              </FormSelect>
-                            </div>
-                          </div>
-
-                          {/* Note */}
-                          <div>
-                            <FormLabel className="text-xs">Note (optional) / نوٹ (اختیاری)</FormLabel>
-                            <FormTextarea
-                              rows={2}
-                              value={notes[it.key] ?? ""}
-                              onChange={(e) => setNote(it.key, e.target.value)}
-                              placeholder="Detail the condition, location, or any temporary control..."
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Custom group inline remove buttons */}
-              {g.title.en === "Custom" && g.items.length > 0 && (
-                <div className="mt-2 text-xs text-slate-500">
-                  You can remove a custom hazard by clicking the trash icon inside its card.
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Add Custom Hazard */}
-          <div className="rounded-xl border p-4">
-            <div className="mb-2 text-sm font-semibold">
-              Add Custom Hazard
-              <span className="ml-2 text-xs opacity-70" dir="rtl">
-                اپنا خطرہ شامل کریں
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <div>
-                <FormLabel>English</FormLabel>
-                <FormTextarea
-                  rows={2}
-                  value={cEn}
-                  onChange={(e) => setCEn(e.target.value)}
-                  placeholder="e.g., Temporary generator backfeed risk"
-                />
-              </div>
-              <div>
-                <FormLabel>Urdu / اُردو</FormLabel>
-                <FormTextarea
-                  rows={2}
-                  value={cUr}
-                  onChange={(e) => setCUr(e.target.value)}
-                  placeholder="مثلاً عارضی جنریٹر بیک فیڈ کا خطرہ"
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-[11px] text-slate-500">
-                Tip: Custom hazards are added with default S3×L3. You can adjust after adding.
-              </div>
-              <Button type="button" variant="primary" onClick={addCustomHazard}>
-                Add / شامل کریں
-              </Button>
-            </div>
-
-            {/* List custom with remove */}
-            {custom.length > 0 && (
-              <ul className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                {custom.map((c) => (
-                  <li
-                    key={c.key}
-                    className="flex items-start justify-between rounded-lg border p-2"
+              return (
+                <div
+                  key={it.id}
+                  className="rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+                >
+                  <div className="text-sm font-semibold text-slate-800">
+                    {it.label_en}
+                  </div>
+                  <div
+                    className="text-xs text-slate-600 opacity-80 mb-2"
+                    dir="rtl"
                   >
-                    <div>
-                      <div>{c.en}</div>
-                      <div className="text-xs opacity-70" dir="rtl">
-                        {c.ur}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeCustom(c.key)}
-                      className="rounded-md px-2 py-1 text-[11px] text-red-600 hover:bg-red-50"
-                      title="Remove"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    {it.label_ur}
+                  </div>
+
+                  {/* YES / NO Radios */}
+                  <div className="flex gap-4">
+                    {["YES", "NO"].map((val) => (
+                      <label
+                        key={val}
+                        className={`flex items-center gap-2 cursor-pointer ${
+                          currentValue === val
+                            ? "text-primary font-medium"
+                            : "text-slate-700"
+                        }`}
+                      >
+                        <FormCheck.Input
+                          type="radio"
+                          name={`item-${it.id}`}
+                          value={val}
+                          checked={currentValue === val}
+                          onChange={() => handleAnswer(it.id, val)}
+                        />
+                        {val}
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* If "Other hazard" selected → extra field */}
+                  {isOther && currentValue === "YES" && (
+                    <FormTextarea
+                      rows={2}
+                      value={otherText}
+                      onChange={(e) => setOtherText(e.target.value)}
+                      placeholder="Specify other hazard..."
+                      className="mt-2 w-full border border-primary/40 bg-primary/5 text-sm"
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Footer actions */}
-          <div className="mt-6 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
-            <div className="text-xs text-slate-600">
-              Selected: <b>{computed.selectedOnly.length}</b> &middot; Highest risk:{" "}
-              <b>{computed.overall}</b>
-            </div>
-          
+          {/* Buttons */}
+          <div className="mt-8 flex justify-end gap-3">
+            <Button type="button" variant="outline-secondary" onClick={back}>
+              Back / واپس جائیں
+            </Button>
+            <Button type="button" variant="outline-secondary" onClick={onReset}>
+              Reset / ری سیٹ
+            </Button>
+            <Button type="submit" variant="primary">
+              Submit / جمع کروائیں
+            </Button>
           </div>
         </div>
       </form>

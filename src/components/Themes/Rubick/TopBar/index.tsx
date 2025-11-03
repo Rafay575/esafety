@@ -7,7 +7,9 @@ import fakerData from "@/utils/faker";
 import _ from "lodash";
 import clsx from "clsx";
 import { Transition } from "@headlessui/react";
-
+import { useDispatch } from "react-redux";
+import { logout } from "@/stores/authSlice";
+import { useNavigate } from "react-router-dom";
 function Main() {
   const [searchDropdown, setSearchDropdown] = useState(false);
   const showSearchDropdown = () => {
@@ -16,7 +18,12 @@ function Main() {
   const hideSearchDropdown = () => {
     setSearchDropdown(false);
   };
-
+ const dispatch = useDispatch();
+ const navigate = useNavigate();
+ const handlelogout = () => {
+    dispatch(logout())
+    navigate('/login')
+ }
   return (
     <>
       {/* BEGIN: Top Bar */}
@@ -178,13 +185,7 @@ function Main() {
             />
           </Menu.Button>
           <Menu.Items className="w-56 mt-px text-white bg-primary">
-            <Menu.Header className="font-normal">
-              <div className="font-medium">{fakerData[0].users[0].name}</div>
-              <div className="text-xs text-white/70 mt-0.5 dark:text-slate-500">
-                {fakerData[0].jobs[0]}
-              </div>
-            </Menu.Header>
-            <Menu.Divider className="bg-white/[0.08]" />
+         
             <Menu.Item className="hover:bg-white/5">
               <Lucide icon="User" className="w-4 h-4 mr-2" /> Profile
             </Menu.Item>
@@ -198,9 +199,12 @@ function Main() {
               <Lucide icon="HelpCircle" className="w-4 h-4 mr-2" /> Help
             </Menu.Item>
             <Menu.Divider className="bg-white/[0.08]" />
+            <button onClick={handlelogout} className="w-full">
+
             <Menu.Item className="hover:bg-white/5">
               <Lucide icon="ToggleRight" className="w-4 h-4 mr-2" /> Logout
             </Menu.Item>
+            </button>
           </Menu.Items>
         </Menu>
       </div>

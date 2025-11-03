@@ -32,13 +32,16 @@ function Main() {
                   className="w-1/2 -mt-16 -intro-x"
                   src={illustrationUrl}
                 />
-                <div className="mt-10 text-4xl font-medium leading-tight text-white -intro-x">
-                  A few more clicks to <br />
-                  sign in to your account.
-                </div>
-                <div className="mt-5 text-lg text-white -intro-x text-opacity-70 dark:text-slate-400">
-                  Manage all your e-commerce accounts in one place
-                </div>
+         <div className="mt-10 text-4xl font-medium leading-tight text-white -intro-x">
+  Empowering workplaces with  <br/>  smarter safety management.
+</div>
+<div className="mt-5 text-lg text-white -intro-x text-opacity-70 dark:text-slate-400">
+  Stay safe, stay alert.
+  Together we prevent incidents.
+  
+</div>
+
+
               </div>
             </div>
             {/* END: Login Info */}

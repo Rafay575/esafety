@@ -15,7 +15,7 @@ import {
 } from "./side-menu";
 import Tippy from "@/components/Base/Tippy";
 import Lucide from "@/components/Base/Lucide";
-import logoUrl from "@/assets/images/logo.svg";
+import logoUrl from "/logo.png";
 import clsx from "clsx";
 import TopBar from "@/components/Themes/Rubick/TopBar";
 import MobileMenu from "@/components/MobileMenu";
@@ -64,7 +64,7 @@ function Main() {
                 src={logoUrl}
               />
               <span className="hidden ml-3 text-lg text-white xl:block">
-                Rubick
+                E-safety
               </span>
             </Link>
             <div className="my-6 side-nav__divider"></div>

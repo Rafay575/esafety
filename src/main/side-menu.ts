@@ -15,129 +15,11 @@ const menu: Array<Menu | "divider"> = [
         title: "LS – PJRA + PTW",
         pathname: "/pjra-ptw",
       },
-      {
-        icon: "ClipboardList",
-        title: "PTW" ,
-        pathname: "/ptw",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 1",
-        pathname: "/1",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 2" ,
-        pathname: "/2",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 3" ,
-        pathname: "/3",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 4" ,
-        pathname: "/4",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 5" ,
-        pathname: "/5",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 6" ,
-        pathname: "/6",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 7" ,
-        pathname: "/7",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 8" ,
-        pathname: "/8",
-      },
-      {
-        icon: "ClipboardList",
-        title: "Form 9" ,
-        pathname: "/9",
-      },
-
-      // 2) SDO Review
-      {
-        icon: "Briefcase",
-        title: "SDO Review",
-        pathname: "/sdo-ptw",
-      },
-
-      // 3) XEN Approval
-      {
-        icon: "CheckCircle2",
-        title: "XEN Approval",
-        pathname: "/xen-ptw",
-      },
-
-      // 4) PDC Review & PTW Issuance
-      {
-        icon: "Stamp",
-        title: "PDC – Issue PTW",
-        pathname: "/pdc-ptw",
-      },
-
-      // 5) Grid Incharge – Pre-Execution
-      {
-        icon: "Wrench",
-        title: "Grid – Pre-Execution",
-       pathname: "/grid-pre-exec",
-      },
-
-      // 6) Execution – LS & Crew (Mobile)
-      {
-        icon: "PlayCircle",
-        title: "Execution (LS & Crew)",
-        subMenu: [
-          { icon: "Play",       title: "Pre-Start",        pathname: "/pre-start" },   // PPE, Roster, Toolbox Talk
-          { icon: "Activity",   title: "Work In Progress", pathname: "/work-inprogress" }, // Notes, Pause/Resume, Suspend, Extension, Incident
-          { icon: "CheckSquare",title: "Completion",       pathname: "/completion" },  // Checklist + Evidence L3
-        ],
-      },
-
-      // 7) Grid Incharge – Final Clearance
     
-
       // Supporting Modules
     ],
   },
-  {
-    icon: "AlertTriangle",
-    title: "Incidents & CAPA",
-    subMenu: [
-      { icon: "Flag",    title: "Report Incident", pathname: "/incident-create" },
-      { icon: "Search",  title: "Investigation",   pathname: "/incident-investigation" },
-      // { icon: "Target",  title: "CAPA Actions",    pathname: "/capa" },
-    ],
-  },
-  {
-    icon: "BarChart3",
-    title: "Reports",
-    subMenu: [
-      { icon: "Gauge",     title: "KPI Cards", pathname: "/reports/kpis" },
-      { icon: "BarChart3", title: "Charts",    pathname: "/reports/charts" },
-      { icon: "Download",  title: "Exports",   pathname: "/reports/exports" },
-      { icon: "Filter",    title: "Filters",   pathname: "/reports/filters" },
-    ],
-  },
-  {
-    icon: "Shield",
-    title: "Logs",
-    subMenu: [
-      { icon: "Image",     title: "Evidence Store", pathname: "/evidence" },
-      { icon: "ClipboardList", title: "Audit Trail",  pathname: "/audit" },
-    ],
-  },
+ 
   
   "divider",
    {
@@ -150,21 +32,10 @@ const menu: Array<Menu | "divider"> = [
       { icon: "GitBranch",  title: "Sub-Divisions",  pathname: "/organization/subdivisions" },
       { icon: "Zap",        title: "Feeders",        pathname: "/organization/feeders" },
       { icon: "Zap",        title: "Transformer",        pathname: "/organization/transformer" },
-      // optional extras for later:
-      // { icon: "TreePine",   title: "Hierarchy Tree", pathname: "/organization/hierarchy" },
-      // { icon: "Building2",  title: "DG-IT Offices",   pathname: "/dg-it-offices" },
+     
     ],
   },
-  {
-    icon: "Settings2",
-    title: "Masters",
-    subMenu: [
-      { icon: "Database",  title: "Assets Registry", pathname: "/admin/assets" },
-      { icon: "FileText",  title: "Templates",       pathname: "/admin/templates" },
-      { icon: "Sliders",   title: "Rules Engine",    pathname: "/admin/rules" },
-      { icon: "KeySquare", title: "Permissions",     pathname: "/roles" },
-    ],
-  },
+ 
 
   
 ];

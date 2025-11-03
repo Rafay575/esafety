@@ -3,9 +3,9 @@ import { useRoutes } from "react-router-dom";
 import Login from "../pages/auth/Login";
 import Register from "../pages/Register";
 import ErrorPage from "../pages/ErrorPage";
-import DashboardOverview1 from "../pages/DashboardOverview1";
-import Users from "../pages/Users";
-import AddUserPage from "../pages/Users/add";
+import Page from "../pages/DashboardOverview1";
+import UsersListPage from "../pages/Users";
+import UsersUpsertPage from "../pages/Users/add";
 import RolesListPage from "../pages/Roles";
 import RoleFormPage from "../pages/Roles/add";
 import PjraPtw from "../pages/PjraPtw";
@@ -32,34 +32,40 @@ import CirclesListPage from "@/pages/organization/circles";
 import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeederListPage from "@/pages/organization/feeders";
-import SituationOfLineBilingual from "@/pages/new";
-import SafetyHazardsBilingual from "@/pages/new/index1";
-import SafetyPrecautionsWizardBilingual from "@/pages/new/index2";
+
 import PTW_Issuer_Software from "@/pages/new/index5";
 import IssuerInstructionsAck_Software from "@/pages/new/index6";
-import LSInstructionsAckSoftware from "@/pages/new/index4";
 import CancellationRequest_Software from "@/pages/new/index7";
 import Canvas9_GridIncharge_Software from "@/pages/new/index8";
-import PTW_SingleForm_BilingualLabels from "@/pages/new/index9";
 import PTW_StepperWizard from "@/pages/ptw/StepperWizard";
+import PTWPreviewPage from "@/pages/new/PTWPreviewPage";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 function Router() {
   const routes = [
+      {
+      element: <ProtectedRoute />,   // ✅ Wrap all protected pages
+      children: [
+        
     {
       path: "/",
       element: <Layout />,
       children: [
         {
           path: "/",
-          element: <DashboardOverview1 />,
+          element: <Page />,
         },
         {
           path: "/users",
-          element: <Users />,
+          element: <UsersListPage />,
         },
         {
           path: "/users/add",
-          element: <AddUserPage />,
+          element: <UsersUpsertPage />,
+        },
+        {
+          path: "/users/:id/edit",
+          element: <UsersUpsertPage />,
         },
         {
           path: "/roles",
@@ -72,6 +78,10 @@ function Router() {
         {
           path: "/pjra-ptw",
           element: <PjraPtw />,
+        },
+        {
+          path: "/ptw/:id",
+          element: <PTWPreviewPage />,
         },
         {
           path: "/pjra-ptw/add",
@@ -165,22 +175,7 @@ function Router() {
           path: "/ptw",
           element: <PTW_StepperWizard />,
         },
-        {
-          path: "/1",
-          element: <SituationOfLineBilingual />,
-        },
-        {
-          path: "/2",
-          element: <SafetyHazardsBilingual />,
-        },
-        {
-          path: "/3",
-          element: <SafetyPrecautionsWizardBilingual />,
-        },
-        {
-          path: "/4",
-          element: <LSInstructionsAckSoftware />,
-        },
+    
         {
           path: "/5",
           element: <PTW_Issuer_Software />,
@@ -197,16 +192,14 @@ function Router() {
           path: "/8",
           element: <Canvas9_GridIncharge_Software />,
         },
-          {
-          path: "/9",
-          element: <PTW_SingleForm_BilingualLabels />,
-        },
+      
  
 
         
        
       ],
     },
+  ]},
     {
       path: "/login",
       element: <Login />,

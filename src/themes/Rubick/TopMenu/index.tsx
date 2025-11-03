@@ -227,22 +227,9 @@ function Main() {
             {/* END: Notifications */}
             {/* BEGIN: Account Menu */}
             <Menu>
-              <Menu.Button className="block w-8 h-8 overflow-hidden scale-110 rounded-full shadow-lg image-fit zoom-in intro-x">
-                <img
-                  alt="Midone Tailwind HTML Admin Template"
-                  src={fakerData[9].photos[0]}
-                />
-              </Menu.Button>
+          
               <Menu.Items className="w-56 mt-px relative bg-primary/80 before:block before:absolute before:bg-black before:inset-0 before:rounded-md before:z-[-1] text-white">
-                <Menu.Header className="font-normal">
-                  <div className="font-medium">
-                    {fakerData[0].users[0].name}
-                  </div>
-                  <div className="text-xs text-white/70 mt-0.5 dark:text-slate-500">
-                    {fakerData[0].jobs[0]}
-                  </div>
-                </Menu.Header>
-                <Menu.Divider className="bg-white/[0.08]" />
+              
                 <Menu.Item className="hover:bg-white/5">
                   <Lucide icon="User" className="w-4 h-4 mr-2" /> Profile
                 </Menu.Item>

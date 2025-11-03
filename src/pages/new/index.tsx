@@ -1,188 +1,192 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "@/components/Base/Button";
-import { FormInput, FormTextarea } from "@/components/Base/Form";
-import FormCheck from "@/components/Base/Form/FormCheck"; // <-- use your FormCheck
+import FormCheck from "@/components/Base/Form/FormCheck";
+import { api } from "@/lib/axios";
+import { toast } from "sonner";
 
-type Item = {
-  key: string;
-  en: string;
-  ur: string;
-};
+export default function SituationOfLine({
+  id,
+  next,
+  back,
+}: {
+  id: number;
+  next: () => void;
+  back: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [checklist, setChecklist] = useState<
+    {
+      id: number;
+      title_en: string;
+      title_ur: string;
+      items: {
+        id: number;
+        label_en: string;
+        label_ur: string;
+      }[];
+    }[]
+  >([]);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
 
-type Group = {
-  title: { en: string; ur: string };
-  items: Item[];
-};
+  // -------- Fetch Checklist and Prefill if existing --------
+  useEffect(() => {
+    const fetchChecklist = async () => {
+      try {
+        setLoading(true);
 
-const GROUPS: Group[] = [
-  {
-    title: { en: "Voltage / Class", ur: "وولٹیج / درجہ" },
-    items: [
-      {
-        key: "lt400",
-        en: "LT line (up to 400 V)",
-        ur: "لو وولٹیج لائن (400 وولٹ تک)",
-      },
-      {
-        key: "ht1133",
-        en: "HT line (11 / 33 kV)",
-        ur: "ایچ ٹی لائن (11 / 33 کلو وولٹ)",
-      },
-    ],
-  },
-  {
-    title: { en: "Status", ur: "حالت" },
-    items: [
-      { key: "dead", en: "Line dead / isolated", ur: "لائن ڈیڈ / آئسولیٹڈ" },
-      {
-        key: "live",
-        en: "Line energized / live",
-        ur: "لائن اینرجائزڈ / چل رہی ہے",
-      },
-      {
-        key: "fed",
-        en: "Feeder is back-feed / being fed",
-        ur: "فیڈر بیک فیڈ یا فیڈ ہے",
-      },
-    ],
-  },
-  {
-    title: { en: "Construction Type", ur: "تعمیر کی قسم" },
-    items: [
-      { key: "oh", en: "Overhead line", ur: "اوور ہیڈ لائن" },
-      { key: "ug", en: "Underground cable", ur: "زیر زمین کیبل" },
-      {
-        key: "dt",
-        en: "Distribution / Transmission line",
-        ur: "ڈسٹری بیوشن / ٹرانسمیشن لائن",
-      },
-    ],
-  },
-  {
-    title: { en: "Other Conditions", ur: "دیگر حالات" },
-    items: [
-      {
-        key: "streetLight",
-        en: "Street lights are ON",
-        ur: "سٹریٹ لائٹس آن ہیں",
-      },
-    ],
-  },
-];
+        // 🟢 Step 1: Fetch the base checklist template
+        const res = await api.get("/api/v1/admin/checklists?type=LINE_TYPE");
+        const checklistData = res.data?.data ?? [];
 
-export default function SituationOfLineBilingual() {
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [notes, setNotes] = useState("");
+        // 🟢 Step 2: Fetch existing answers from PTW preview
+        const preview = await api.get(`/api/v1/ptw/${id}/preview`);
+        const existingAnswers =
+          preview.data?.data?.checklists?.LINE_TYPE ?? [];
 
-  const toggle = (k: string) => setSelected((s) => ({ ...s, [k]: !s[k] }));
+        // 🟢 Step 3: Convert existing answers → { [itemId]: value }
+        const prefilled: Record<number, string> = {};
+        existingAnswers.forEach(
+          (a: { id: number; value: string | null }) => {
+            if (a.value) prefilled[a.id] = a.value;
+          }
+        );
 
-  const onSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      selected: Object.keys(selected).filter((k) => selected[k]),
-      notes,
+        setChecklist(checklistData);
+        setAnswers(prefilled);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load checklist or preview data");
+      } finally {
+        setLoading(false);
+      }
     };
-    console.log("SITUATION_OF_LINE:", payload);
-    alert("Saved. Check console for payload.");
+
+    fetchChecklist();
+  }, [id]);
+
+  // -------- Handle Answer Change --------
+  const handleAnswer = (itemId: number, value: string) => {
+    setAnswers((prev) => ({ ...prev, [itemId]: value }));
   };
 
-  const onReset = () => {
-    setSelected({});
-    setNotes("");
+  // -------- Submit --------
+  const onSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formattedAnswers = Object.entries(answers).map(([id, val]) => ({
+      checklist_item_id: Number(id),
+      value: val,
+    }));
+
+    if (formattedAnswers.length === 0) {
+      toast.error("Please answer at least one item before submitting.");
+      return;
+    }
+
+    const payload = { answers: formattedAnswers };
+    console.log("🚀 Payload Sent:", payload);
+
+    try {
+      await api.post(`/api/v1/ptw/${id}/step2-line`, payload);
+      toast.success("Checklist saved successfully!");
+      next();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save checklist");
+    }
   };
 
+  const onReset = () => setAnswers({});
+
+  if (loading)
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        Loading checklist...
+      </div>
+    );
+
+  const group = checklist[0];
+  if (!group)
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        No checklist data found
+      </div>
+    );
+
+  // -------- UI --------
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-      <div className=" border-b bg-white/90 backdrop-blur-sm">
+      <div className="border-b bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div>
-            <h1 className="text-xl font-semibold">
-              Checklist – Situation of Line where PTW is required
-            </h1>
+            <h1 className="text-xl font-semibold">{group.title_en}</h1>
             <p className="text-xs opacity-70" dir="rtl">
-              پی ٹی ڈبلیو درکار ہونے کی صورت میں لائن کی صورتحال — چیک لسٹ
+              {group.title_ur}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Form */}
+      {/* Checklist Form */}
       <form onSubmit={onSave} className="mx-auto max-w-5xl px-6 pb-24 pt-4">
-        <div className="rounded-2xl border bg-white p-6 ">
-          {GROUPS.map((g) => (
-            <div key={g.title.en} className="mb-5">
-              <div className="mb-2 border-b pb-1 text-sm font-semibold">
-                {g.title.en}
-                <span className="ml-2 text-xs opacity-70" dir="rtl">
-                  {g.title.ur}
-                </span>
-              </div>
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {group.items.map((it) => (
+              <div
+                key={it.id}
+                className="rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+              >
+                <div className="text-sm font-semibold text-slate-800">
+                  {it.label_en}
+                </div>
+                <div
+                  className="text-xs text-slate-600 opacity-80 mb-2"
+                  dir="rtl"
+                >
+                  {it.label_ur}
+                </div>
 
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {g.items.map((it) => {
-                  const checked = !!selected[it.key];
-                  return (
-                    <div
-                      key={it.key}
-                      onClick={() => toggle(it.key)} // ✅ clicking anywhere toggles checkbox
-                      className={`cursor-pointer rounded-lg border p-3 transition hover:bg-slate-50 ${
-                        checked
-                          ? "border-primary/60 bg-primary/5"
-                          : "border-slate-200"
+                {/* YES / NO radio buttons */}
+                <div className="flex gap-4">
+                  {["YES", "NO"].map((val) => (
+                    <label
+                      key={val}
+                      className={`flex items-center gap-2 cursor-pointer ${
+                        answers[it.id] === val
+                          ? "text-primary font-medium"
+                          : "text-slate-700"
                       }`}
                     >
-                      <FormCheck className="items-start">
-                        <FormCheck.Input
-                          type="checkbox"
-                          checked={checked}
-                          readOnly // ✅ prevent double-trigger when wrapper handles click
-                          className="mt-0.5 pointer-events-none"
-                          aria-checked={checked}
-                          aria-label={it.en}
-                        />
-                        <FormCheck.Label className="ml-3 select-none">
-                          <div className="text-sm font-medium text-slate-800">
-                            {it.en}
-                          </div>
-                          <div
-                            className="text-xs text-slate-600 opacity-80"
-                            dir="rtl"
-                          >
-                            {it.ur}
-                          </div>
-                        </FormCheck.Label>
-                      </FormCheck>
-                    </div>
-                  );
-                })}
+                      <FormCheck.Input
+                        type="radio"
+                        name={`item-${it.id}`}
+                        value={val}
+                        checked={answers[it.id] === val}
+                        onChange={() => handleAnswer(it.id, val)}
+                      />
+                      {val}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-
-          {/* Notes */}
-          <div className="mt-4">
-            <div className="mb-1 text-sm font-semibold">
-              Notes{" "}
-              <span className="ml-2 text-xs opacity-70" dir="rtl">
-                نوٹس
-              </span>
-            </div>
-            <FormTextarea
-              rows={3}
-              value={notes}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                setNotes(e.target.value)
-              }
-              placeholder="Write any additional notes here..."
-              className="w-full"
-            />
+            ))}
           </div>
 
           {/* Buttons */}
-     
+          <div className="mt-8 flex justify-end gap-3">
+            <Button type="button" variant="outline-secondary" onClick={back}>
+              Back / واپس جائیں
+            </Button>
+            <Button type="button" variant="outline-secondary" onClick={onReset}>
+              Reset / ری سیٹ
+            </Button>
+            <Button type="submit" variant="primary">
+              Submit / جمع کروائیں
+            </Button>
+          </div>
         </div>
       </form>
     </div>

@@ -3,13 +3,14 @@ import darkModeReducer from "./darkModeSlice";
 import colorSchemeReducer from "./colorSchemeSlice";
 import menuReducer from "./menuSlice";
 import themeReducer from "./themeSlice";
-
+import authReducer from "./authSlice";
 export const store = configureStore({
   reducer: {
     darkMode: darkModeReducer,
     colorScheme: colorSchemeReducer,
     menu: menuReducer,
     theme: themeReducer,
+       auth: authReducer,
   },
 });
 

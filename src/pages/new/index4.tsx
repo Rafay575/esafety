@@ -48,7 +48,7 @@ const ITEMS = [
   },
 ];
 
-export default function LSInstructionsAckSoftware() {
+export default function LSInstructionsAckSoftware({next,back}:{next:()=>void,back:()=>void}) {
   const [ack, setAck] = useState(false);
   const [scrolledEnd, setScrolledEnd] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -62,10 +62,7 @@ export default function LSInstructionsAckSoftware() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ack) {
-      alert("⚠️ Please scroll and acknowledge before submitting.");
-      return;
-    }
+   
     const payload = {
       role: "Line Superintendent / Permit Receiver",
       acknowledged: true,
@@ -73,7 +70,7 @@ export default function LSInstructionsAckSoftware() {
       timestamp: new Date().toISOString(),
     };
     console.log("✅ LS_ACK:", payload);
-    alert("Acknowledgment submitted. Check console for payload.");
+   next()
   };
 
   const handleReset = () => {
@@ -131,35 +128,14 @@ export default function LSInstructionsAckSoftware() {
 
       
 
-          {/* Acknowledgment */}
-        {/* Acknowledgment */}
-<div
-  className={`mt-6 rounded-xl border p-3 bg-white shadow-sm cursor-pointer transition ${
-    ack ? "border-primary/60 bg-primary/5" : "border-slate-200 hover:border-slate-300"
-  }`}
-  onClick={() => setAck((prev) => !prev)}
->
-  <FormCheck className="items-start">
-    <FormCheck.Input
-      type="checkbox"
-      readOnly
-      checked={ack}
-      className="mt-0.5 pointer-events-none"
-      aria-checked={ack}
-    />
-    <FormCheck.Label className="ml-3 select-none">
-      <div className="text-sm font-medium text-slate-800">
-        I have read and will adhere to the above instructions.
-      </div>
-      <div className="text-xs text-slate-600 opacity-80" dir="rtl">
-        میں نے اوپر دی گئی ہدایات پڑھ لیں اور ان پر عمل کروں گا/گی
-      </div>
-    </FormCheck.Label>
-  </FormCheck>
-</div>
-
-
-          {/* Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+           <Button type="button" variant="outline-secondary" onClick={back}>
+              Back / واپس جائیں
+            </Button>
+            <Button type="submit" variant="primary"  onClick={next}>
+            Submit / جمع کروائیں
+            </Button>
+          </div>
         
         </div>
       </form>
