@@ -13,7 +13,7 @@ export default function StateError({
   return (
     <div className="flex flex-col items-center justify-center py-16 text-red-500 dark:text-red-400">
       <AlertTriangle className="w-6 h-6 mb-3" />
-      <p className="text-sm mb-3">{message}</p>
+      <p className="text-sm mb-3">Access Denied.</p>
       {onRetry && (
         <button
           onClick={onRetry}
