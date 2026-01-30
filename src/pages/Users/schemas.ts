@@ -16,14 +16,31 @@ export const schema = yup.object({
   department_id: yup.string().required("Department is required"),
   designation_id: yup.string().required("Designation is required"),
   role: yup.string().required("Role is required"),
-    password: yup
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .required("Password is required"),
-  password_confirmation: yup
-    .string()
-    .oneOf([yup.ref("password")], "Passwords must match")
-    .required("Please confirm password"),
+
+  // ✔ FIXED — store string "yyyy-mm-dd"
+  date_of_joining: yup
+  .string()
+  .required("Date of Joining is required")
+  .matches(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (yyyy-mm-dd)"),
+
+  date_of_birth: yup
+  .string()
+  .required("Date of Birth is required")
+  .matches(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (yyyy-mm-dd)"),
+
+
+  // ✔ Only required on create
+  password: yup.string().when("$isEdit", {
+    is: false,
+    then: (s) => s.min(8).required("Password is required"),
+    otherwise: (s) => s.notRequired(),
+  }),
+
+  password_confirmation: yup.string().when("$isEdit", {
+    is: false,
+    then: (s) => s.oneOf([yup.ref("password")], "Passwords must match"),
+    otherwise: (s) => s.notRequired(),
+  }),
 });
 
 export type FormValues = yup.InferType<typeof schema>;

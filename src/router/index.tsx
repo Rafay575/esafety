@@ -32,7 +32,7 @@ import CirclesListPage from "@/pages/organization/circles";
 import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeederListPage from "@/pages/organization/feeders";
-
+import TransformerListPage  from "@/pages/organization/transformer";
 import PTW_Issuer_Software from "@/pages/new/index5";
 import IssuerInstructionsAck_Software from "@/pages/new/index6";
 import CancellationRequest_Software from "@/pages/new/index7";
@@ -40,6 +40,9 @@ import Canvas9_GridIncharge_Software from "@/pages/new/index8";
 import PTW_StepperWizard from "@/pages/ptw/StepperWizard";
 import PTWPreviewPage from "@/pages/new/PTWPreviewPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ViewUser from "@/pages/Users/view";
+import PostingForm from "@/pages/UserPosting";
+import GridStationListPage from "@/pages/organization/grid";
 
 function Router() {
   const routes = [
@@ -56,12 +59,20 @@ function Router() {
           element: <Page />,
         },
         {
+          path: "/users/:id",
+          element: <ViewUser />,
+        },
+        {
           path: "/users",
           element: <UsersListPage />,
         },
         {
           path: "/users/add",
           element: <UsersUpsertPage />,
+        },
+        {
+          path: "/users-posting",
+          element: <PostingForm />,
         },
         {
           path: "/users/:id/edit",
@@ -170,6 +181,14 @@ function Router() {
         {
           path: "/organization/feeders",
           element: <FeederListPage />,
+        },
+        {
+          path: "/organization/transformer",
+          element: <TransformerListPage />,
+        },
+        {
+          path: "/organization/grid",
+          element: <GridStationListPage />,
         },
         {
           path: "/ptw",

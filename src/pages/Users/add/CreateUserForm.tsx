@@ -1,7 +1,5 @@
-"use client";
-
 import React, { useEffect, useMemo, useState } from "react";
-import Button from "@/components/Base/Button";
+import clsx from "clsx";
 import { FormInput, FormLabel } from "@/components/Base/Form";
 import Lucide from "@/components/Base/Lucide";
 import { Controller, useForm } from "react-hook-form";
@@ -14,26 +12,35 @@ import { FormValues, schema } from "../schemas";
 import SearchSelect from "@/components/Base/SearchSelect";
 import PasswordInput from "@/components/Base/Form/PasswordInput";
 import { Loader } from "lucide-react";
+import DateSelector from "@/components/Base/Form/DateSelector";
+import { useNavigate } from "react-router-dom";
+import Button from "@/components/Base/Button";
 
 interface Props {
-  userId?: number; // ✅ Optional, for edit mode
+  userId?: number;
 }
 
 export default function CreateUserForm({ userId }: Props) {
   const isEdit = !!userId;
-
+  const navigate = useNavigate();
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<number | null>(null);
 
-  // ✅ Fetch user data if editing
   const { data: userData, isLoading: userLoading } = useUser(userId);
   const { data: departments = [], isLoading: deptLoading } = useDepartments();
   const { data: designations = [], isLoading: desigLoading } =
     useDesignations(selectedDept);
   const { data: roles = [], isLoading: rolesLoading } = useRoles();
 
-  // --- Static options
+  // 🧠 Helper to format date to yyyy-mm-dd
+  function formatDate(date: Date | string | null): string | null {
+    if (!date) return null;
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split("T")[0];
+  }
+
   const GENDERS = useMemo(
     () => [
       { value: "male", label: "Male" },
@@ -53,18 +60,14 @@ export default function CreateUserForm({ userId }: Props) {
   } = useForm<FormValues>({
     resolver: yupResolver(schema),
     mode: "onChange",
-    // defaultValues intentionally empty; we will reset() with server data
   });
 
-  // 🔄 Pre-fill form on edit
+  // 🔄 Prefill user data
   useEffect(() => {
     if (!userData) return;
 
     const deptId =
-      userData?.designation?.department_id ??
-      userData?.department_id ??
-      null;
-
+      userData?.designation?.department_id ?? userData?.department_id ?? null;
     setSelectedDept(deptId);
 
     reset(
@@ -78,15 +81,16 @@ export default function CreateUserForm({ userId }: Props) {
         department_id: (deptId ?? "") as any,
         designation_id: (userData.designation_id ?? "") as any,
         role: userData.roles?.[0]?.name || "",
-        // password fields omitted in edit mode
+        date_of_birth: userData.date_of_birth ?? "",
+        date_of_joining: userData.date_of_joining ?? "",
       },
-      { keepDirty: false } // important so dirtyFields starts clean
+      { keepDirty: false }
     );
 
     setAvatarPreview(userData.avatar_url || null);
   }, [userData, reset]);
 
-  // --- Handle Avatar Upload
+  // --- Avatar handlers
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -100,82 +104,85 @@ export default function CreateUserForm({ userId }: Props) {
     setAvatarPreview(null);
   };
 
-  // 🧠 Build changed-only payload from dirtyFields
+  // --- Build changed-only payload
   function buildChangedOnly(): Partial<FormValues> {
     const vals = getValues();
     const changed: Partial<FormValues> = {};
 
     (Object.keys(dirtyFields) as (keyof FormValues)[]).forEach((key) => {
-      // RHF sets dirtyFields[key] to true or an object for nested fields
-      if (dirtyFields[key]) {
-        // cast numbers coming from SearchSelect if needed
-        // ensures strings/numbers serialize fine in FormData
-        (changed as any)[key] = vals[key] as any;
-      }
+      if (dirtyFields[key]) (changed as any)[key] = vals[key] as any;
     });
+
+    // ✅ Always format dates properly if they exist
+    if (changed.date_of_birth)
+      changed.date_of_birth = formatDate(changed.date_of_birth as any) as any;
+    if (changed.date_of_joining)
+      changed.date_of_joining = formatDate(
+        changed.date_of_joining as any
+      ) as any;
 
     return changed;
   }
 
-  // --- React Query Mutation (Create/Update)
+  // --- API Mutation (create/update)
   const mutation = useMutation({
-    mutationFn: async (payload: { mode: "create" | "edit"; body: Partial<FormValues> }) => {
+    mutationFn: async (payload: {
+      mode: "create" | "edit";
+      body: Partial<FormValues>;
+    }) => {
       const fd = new FormData();
-
-      // append fields
       Object.entries(payload.body).forEach(([k, v]) => {
         if (v !== undefined && v !== null) fd.append(k, String(v));
       });
-
       if (avatar) fd.append("avatar", avatar);
 
       if (payload.mode === "edit") {
-        // Laravel method spoofing
         fd.append("_method", "PATCH");
         return api.post(`/api/v1/users/${userId}`, fd, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
-
-      // Create
       return api.post("/api/v1/users", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     },
-
     onSuccess: () => {
-      toast.success(isEdit ? "User updated successfully!" : "User created successfully!");
+      toast.success(
+        isEdit ? "User updated successfully!" : "User created successfully!"
+      );
       if (!isEdit) {
         reset();
         removeAvatar();
       }
+      navigate("/users");
     },
-
     onError: (err: any) => {
       console.error("❌ mutation error", err);
       toast.error(err?.response?.data?.message || "Something went wrong.");
     },
   });
 
-  // ✅ Unified submit
+  // --- Form submit
   const onSubmit = (data: FormValues) => {
-    // NOTE: handleSubmit already validated the data here.
+    console.log("hello");
+    const formatted: any = {
+      ...data,
+      date_of_birth: formatDate(data.date_of_birth),
+      date_of_joining: formatDate(data.date_of_joining),
+    };
+
+    console.log("hello");
     if (isEdit) {
       const changed = buildChangedOnly();
+      console.log("🚀 changed", changed);
       const hasAnyChange = Object.keys(changed).length > 0 || !!avatar;
-
-      // Debug logs to confirm flow
-      // console.log("isEdit submit → changed:", changed, "avatar?", !!avatar);
-
       if (!hasAnyChange) {
         toast.info("No changes to update.");
         return;
       }
-
       mutation.mutate({ mode: "edit", body: changed });
     } else {
-      // On create, send full data (password fields present)
-      mutation.mutate({ mode: "create", body: data });
+      mutation.mutate({ mode: "create", body: formatted });
     }
   };
 
@@ -189,10 +196,13 @@ export default function CreateUserForm({ userId }: Props) {
 
   return (
     <div className="my-5">
-      <div className="rounded-2xl border bg-white shadow-lg p-8 space-y-8 relative">
+      <div className="rounded-2xl border bg-white intro-y shadow-lg p-8 space-y-8 relative">
         <div className="flex items-center justify-between border-b pb-4">
           <h1 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
-            <Lucide icon={isEdit ? "UserCheck" : "UserPlus"} className="w-6 h-6 text-primary" />
+            <Lucide
+              icon={isEdit ? "UserCheck" : "UserPlus"}
+              className="w-6 h-6 text-primary"
+            />
             {isEdit ? "Edit User" : "Create New User"}
           </h1>
         </div>
@@ -238,13 +248,15 @@ export default function CreateUserForm({ userId }: Props) {
           </div>
 
           {/* Basic Info */}
-          <div className="col-span-12 md:col-span-4">
+          <div className="col-span-12 md:col-span-3">
             <FormLabel>Name *</FormLabel>
             <FormInput {...register("name")} placeholder="Full Name" />
-            {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+            {errors.name && (
+              <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>
+            )}
           </div>
 
-          <div className="col-span-12 md:col-span-4">
+          <div className="col-span-12 md:col-span-3">
             <FormLabel>Gender *</FormLabel>
             <Controller
               name="gender"
@@ -257,31 +269,105 @@ export default function CreateUserForm({ userId }: Props) {
                 />
               )}
             />
-            {errors.gender && <p className="text-xs text-red-500 mt-1">{errors.gender.message}</p>}
+            {errors.gender && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.gender.message}
+              </p>
+            )}
+          </div>
+          {/* Date of Birth */}
+          <div className="col-span-12 md:col-span-3">
+            <FormLabel>Date of Birth *</FormLabel>
+            <Controller
+              name="date_of_birth"
+              control={control}
+              render={({ field }) => (
+                <DateSelector
+                  value={field.value ? new Date(field.value) : null}
+                  onChange={(date) => {
+        if (!date) return field.onChange("");
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        field.onChange(`${yyyy}-${mm}-${dd}`);
+      }}
+                  placeholder="Select Date of Birth"
+                  dateFormat="yyyy/MM/dd"
+                />
+              )}
+            />
+
+            {errors.date_of_birth && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.date_of_birth.message}
+              </p>
+            )}
+          </div>
+
+          {/* Date of Joining */}
+          <div className="col-span-12 md:col-span-3">
+            <FormLabel>Date of Joining *</FormLabel>
+            <Controller
+              name="date_of_joining"
+              control={control}
+              render={({ field }) => (
+                <DateSelector
+                  value={field.value ? new Date(field.value) : null}
+                  onChange={(date) => {
+        if (!date) return field.onChange("");
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        field.onChange(`${yyyy}-${mm}-${dd}`);
+      }}
+                  placeholder="Select Date of Joining"
+                  dateFormat="yyyy/mm/dd"
+                />
+              )}
+            />
+            {errors.date_of_joining && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.date_of_joining.message}
+              </p>
+            )}
           </div>
 
           <div className="col-span-12 md:col-span-4">
             <FormLabel>CNIC *</FormLabel>
             <FormInput {...register("cnic")} placeholder="35202-1234567-1" />
-            {errors.cnic && <p className="text-xs text-red-500 mt-1">{errors.cnic.message}</p>}
+            {errors.cnic && (
+              <p className="text-xs text-red-500 mt-1">{errors.cnic.message}</p>
+            )}
           </div>
 
           <div className="col-span-12 md:col-span-4">
             <FormLabel>Phone *</FormLabel>
             <FormInput {...register("phone")} placeholder="+923001112256" />
-            {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone.message}</p>}
+            {errors.phone && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.phone.message}
+              </p>
+            )}
           </div>
 
           <div className="col-span-12 md:col-span-4">
             <FormLabel>Email *</FormLabel>
             <FormInput {...register("email")} placeholder="user@hrpsp.net" />
-            {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
+            {errors.email && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           <div className="col-span-12 md:col-span-4">
             <FormLabel>SAP Code *</FormLabel>
             <FormInput {...register("sap_code")} placeholder="1000" />
-            {errors.sap_code && <p className="text-xs text-red-500 mt-1">{errors.sap_code.message}</p>}
+            {errors.sap_code && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.sap_code.message}
+              </p>
+            )}
           </div>
 
           {/* Department & Designation */}
@@ -299,7 +385,10 @@ export default function CreateUserForm({ userId }: Props) {
                     setSelectedDept(id);
                   }}
                   value={field.value ?? ""}
-                  options={departments.map((d: any) => ({ value: d.id, label: d.name }))}
+                  options={departments.map((d: any) => ({
+                    value: d.id,
+                    label: d.name,
+                  }))}
                   placeholder="Select Department"
                   loading={deptLoading}
                 />
@@ -317,7 +406,10 @@ export default function CreateUserForm({ userId }: Props) {
                   {...field}
                   onChange={(val) => field.onChange(Number(val))}
                   value={field.value ?? ""}
-                  options={designations.map((d: any) => ({ value: d.id, label: d.name }))}
+                  options={designations.map((d: any) => ({
+                    value: d.id,
+                    label: d.name,
+                  }))}
                   placeholder="Select Designation"
                   disabled={!selectedDept}
                   loading={desigLoading}
@@ -335,7 +427,10 @@ export default function CreateUserForm({ userId }: Props) {
                 <SearchSelect
                   {...field}
                   value={field.value}
-                  options={roles.map((r: any) => ({ value: r.name, label: r.name }))}
+                  options={roles.map((r: any) => ({
+                    value: r.name,
+                    label: r.name,
+                  }))}
                   placeholder="Select Role"
                   loading={rolesLoading}
                 />
@@ -348,11 +443,17 @@ export default function CreateUserForm({ userId }: Props) {
             <>
               <div className="col-span-12 md:col-span-4">
                 <FormLabel>Password *</FormLabel>
-                <PasswordInput {...register("password")} placeholder="Enter password" />
+                <PasswordInput
+                  {...register("password")}
+                  placeholder="Enter password"
+                />
               </div>
               <div className="col-span-12 md:col-span-4">
                 <FormLabel>Confirm Password *</FormLabel>
-                <PasswordInput {...register("password_confirmation")} placeholder="Confirm password" />
+                <PasswordInput
+                  {...register("password_confirmation")}
+                  placeholder="Confirm password"
+                />
               </div>
             </>
           )}
@@ -371,13 +472,13 @@ export default function CreateUserForm({ userId }: Props) {
             </Button>
 
             {/* 👇 IMPORTANT: ensure your Button component passes `type` down */}
-            <Button type="submit" variant="primary" disabled={isSubmitting || mutation.isPending}>
+            <Button
+              type="submit" // ✅ now this will actually submit the form
+              variant="primary"
+              disabled={isSubmitting || mutation.isPending}
+            >
               <Lucide icon="Save" className="w-4 h-4 mr-2" />
-              {isSubmitting || mutation.isPending
-                ? "Saving..."
-                : isEdit
-                ? "Update User"
-                : "Create User"}
+              {isEdit ? "Update User" : "Create User"}
             </Button>
           </div>
         </form>
@@ -385,3 +486,4 @@ export default function CreateUserForm({ userId }: Props) {
     </div>
   );
 }
+

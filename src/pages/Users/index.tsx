@@ -106,6 +106,11 @@ export default function UsersListPage() {
   const actions: TableAction<OrgUserRow>[] = React.useMemo(
     () => [
       {
+        label: "View",
+        icon: "Eye",
+        onClick: (row) => navigate(`/users/${row.id}`),
+      },
+      {
         label: "Edit",
         icon: "PencilLine",
         onClick: (row) => navigate(`/users/${row.id}/edit`),

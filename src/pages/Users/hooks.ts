@@ -117,7 +117,7 @@ async function fetchUsers(params: {
 
   // Expecting shape: { data: User[], meta: { total, per_page, current_page, ... } }
   const rows: OrgUserRow[] = (data?.data ?? []).map(toRow);
-  const total: number = data?.meta?.total ?? rows.length;
+  const total: number = data?.total ?? rows.length;
 
   return { rows, meta: { total } };
 }
@@ -140,3 +140,50 @@ export function useDebouncedValue<T>(value: T, delay = 400) {
   return debounced;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  gender: string;
+  cnic: string;
+  phone: string;
+  email: string;
+  sap_code: string;
+  date_of_birth: string | null;
+  date_of_joining: string | null;
+  is_active: number | boolean;
+
+  avatar_url?: string | null;
+  department_name?: string | null;
+  designation_name?: string | null;
+
+  department?: { id: number; name: string } | null;
+  designation?: { id: number; name: string } | null;
+
+  created_at: string;
+  updated_at: string;
+  last_login_at?: string | null;
+
+  roles: { id: number; name: string }[];
+}
+export interface UserResponse {
+  data: User;
+  editable_fields_all: string[];
+  note: string;
+}
+
+
+export async function getUser(id: number): Promise<UserResponse> {
+  const { data } = await api.get(`/api/v1/users/${id}`);
+  return data;
+}
+
+
+export function usePostingHistory(userId: number) {
+  return useQuery({
+    queryKey: ["posting-history", userId],
+    queryFn: async () => {
+      const { data } = await api.get(`/api/v1/meta/users/${userId}/posting-history`);
+      return data?.history ?? [];
+    },
+  });
+}

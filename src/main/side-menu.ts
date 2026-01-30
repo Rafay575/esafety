@@ -2,16 +2,17 @@ import { type Menu } from "@/stores/menuSlice";
 
 const menu: Array<Menu | "divider"> = [
   { icon: "Home", title: "Dashboard", pathname: "/" },
-  { icon: "Home", title: "Users", pathname: "/users" },
+  { icon: "User", title: "Users", pathname: "/users" },
+  { icon: "SignpostBig", title: "User Posting", pathname: "/users-posting" },
 
   // ─────────────────── MEPCO E-Safety (PTW) ───────────────────
   {
-    icon: "Activity",
+    icon: "FileType",
     title: "E-Safety (PTW)",
     subMenu: [
       // 1) LS – PJRA + PTW (with Team Allocation & Conflict Checks)
       {
-        icon: "ClipboardList",
+        icon: "Activity",
         title: "LS – PJRA + PTW",
         pathname: "/pjra-ptw",
       },
@@ -31,11 +32,11 @@ const menu: Array<Menu | "divider"> = [
       { icon: "Layers",     title: "Divisions",      pathname: "/organization/divisions" },
       { icon: "GitBranch",  title: "Sub-Divisions",  pathname: "/organization/subdivisions" },
       { icon: "Zap",        title: "Feeders",        pathname: "/organization/feeders" },
-      // { icon: "Zap",        title: "Transformer",        pathname: "/organization/transformer" },
-     
+      { icon: "Antenna",        title: "Transformer",        pathname: "/organization/transformer" },
+      { icon: "Zap",        title: "Grid",        pathname: "/organization/grid" },
+
     ],
   },
- 
 
   
 ];

@@ -1,4 +1,4 @@
-// lookups.ts
+
 import { api } from "@/lib/axios";
 
 export async function getRelatedByCircle(circle_id: number) {
