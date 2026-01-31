@@ -20,6 +20,7 @@ interface SearchSelectProps {
   disabled?: boolean;
   loading?: boolean;
   className?: string;
+  required?: boolean
 }
 
 /**
@@ -35,6 +36,7 @@ const SearchSelect = forwardRef<HTMLDivElement, SearchSelectProps>(
       disabled = false,
       loading = false,
       className,
+      required=false
     },
     ref
   ) => {

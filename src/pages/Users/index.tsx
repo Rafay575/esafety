@@ -35,7 +35,7 @@ export default function UsersListPage() {
       {
         key: "userCode",
         label: "User Code",
-        render: (row) => <span className="font-medium text-slate-800">{row.userCode}</span>,
+        render: (row) => <span className="font-medium text-slate-800">{row.sap_code}</span>,
       },
       {
         key: "name",

@@ -72,7 +72,7 @@ export function useUser(userId?: number) {
 
 export type OrgUserRow = {
   id: number;
-  userCode: string;
+  sap_code: string;
   name: string;
   email: string;
   phone: string;
@@ -86,7 +86,7 @@ export type OrgUserRow = {
 function toRow(u: any): OrgUserRow {
   return {
     id: u.id,
-    userCode: `USR-${String(u.id).padStart(4, "0")}`,
+    sap_code: u.sap_code,
     name: u.name ?? "—",
     email: u.email ?? "—",
     phone: u.phone ?? "—",
@@ -144,9 +144,9 @@ export interface User {
   id: number;
   name: string;
   gender: string;
-  cnic: string;
-  phone: string;
-  email: string;
+  cnic?: string;
+  phone?: string;
+  email?: string;
   sap_code: string;
   date_of_birth: string | null;
   date_of_joining: string | null;

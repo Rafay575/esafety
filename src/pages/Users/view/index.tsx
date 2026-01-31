@@ -289,6 +289,7 @@ function PostingBlock({ data }: { data: any }) {
       <PostingRow label="Division" value={data.division?.name} />
       <PostingRow label="Sub Division" value={data.sub_division?.name} />
       <PostingRow label="Feeder" value={data.feeder?.name} />
+      <PostingRow label="Grid" value={data.grid?.name} />
     </div>
   );
 }

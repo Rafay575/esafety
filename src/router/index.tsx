@@ -7,7 +7,6 @@ import Page from "../pages/DashboardOverview1";
 import UsersListPage from "../pages/Users";
 import UsersUpsertPage from "../pages/Users/add";
 import RolesListPage from "../pages/Roles";
-import RoleFormPage from "../pages/Roles/add";
 import PjraPtw from "../pages/PjraPtw";
 import PtwCreate from "../pages/PjraPtw/add";
 import SdoPtwList from "../pages/SdoPtw";
@@ -82,10 +81,7 @@ function Router() {
           path: "/roles",
           element: <RolesListPage />,
         },
-        {
-          path: "/roles/add",
-          element: <RoleFormPage />,
-        },
+      
         {
           path: "/pjra-ptw",
           element: <PjraPtw />,

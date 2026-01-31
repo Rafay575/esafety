@@ -64,7 +64,7 @@ const DateSelector = forwardRef<HTMLInputElement, Props>(
           yearDropdownItemNumber={80}
           wrapperClassName="w-full"
           popperClassName="z-50 w-full"
-          calendarClassName="rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 backdrop-blur-md text-slate-700 dark:text-slate-200"
+          calendarClassName="rounded-2xl shadow-lg border border-slate-200  text-slate-700 dark:text-slate-200"
           open={open}
           onClickOutside={() => setOpen(false)}
           onSelect={() => setOpen(false)}
