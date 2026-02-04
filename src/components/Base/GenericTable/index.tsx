@@ -114,7 +114,7 @@ export function GenericTable<T extends Record<string, any>>({
                   key={String(col.key)}
                   className={clsx(
                     "px-6 py-3 font-medium text-xs uppercase tracking-wider",
-                    col.className
+                    col.className,
                   )}
                 >
                   {col.label}
@@ -161,15 +161,12 @@ export function GenericTable<T extends Record<string, any>>({
                     const key = String(col.key);
                     const value = row[key as keyof T];
 
-                    
-
-
                     return (
                       <td
                         key={key}
                         className={clsx(
                           "px-6 py-3 text-slate-700 dark:text-slate-300",
-                          col.className
+                          col.className,
                         )}
                       >
                         {col.render ? col.render(row, index) : (value as any)}
@@ -193,12 +190,16 @@ export function GenericTable<T extends Record<string, any>>({
                           {actions.map((action) => (
                             <button
                               key={action.label}
-                              onClick={() => action.onClick(row)}
+                              onClick={() => {console.log("hello");action.onClick(row)}}
+                              onTouchEnd={(e) => {
+                                e.preventDefault(); // Prevents double-tap zoom
+                                action.onClick(row);
+                              }}
                               className={clsx(
                                 "flex items-center w-full px-3 py-2 text-sm gap-2 rounded-md text-left transition-colors",
                                 action.variant === "danger"
                                   ? "text-danger hover:bg-red-50 dark:hover:bg-red-500/10"
-                                  : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                                  : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/70",
                               )}
                             >
                               {action.icon && (

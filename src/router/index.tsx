@@ -42,7 +42,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import ViewUser from "@/pages/Users/view";
 import PostingForm from "@/pages/UserPosting";
 import GridStationListPage from "@/pages/organization/grid";
-
+import Esafetyperformance from "@/pages/Reports/Esafetyperformance";
 function Router() {
   const routes = [
       {
@@ -80,6 +80,11 @@ function Router() {
         {
           path: "/roles",
           element: <RolesListPage />,
+        },
+      
+        {
+          path: "/reports/esafety-performance",
+          element: <Esafetyperformance />,
         },
       
         {
