@@ -43,3 +43,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.table-report tbody tr:nth-child(odd) {
+  background-color: #f8fafc; /* bg-slate-50 */
+}
+
+.table-report tbody tr:nth-child(even) {
+  background-color: #ffffff; /* bg-white */
+}
+
+.table-report tbody tr:hover {
+  background-color: #f1f5f9; /* bg-slate-100 */
+}

@@ -14,6 +14,8 @@ const hasUserViewPermission =
   user?.permissions?.includes("users.view.any") || false;
 const hasPostingViewPermission =
   user?.permissions?.includes("users.view.posting") || false;
+const hasReportingViewPermission =
+  user?.permissions?.includes("reports.view.esaftyPerformance") || false;
 
 // Start building the menu
 const menu: Array<Menu | "divider"> = [
@@ -49,6 +51,13 @@ menu.push({
     },
   ],
 });
+
+// Add divider if we have items before Organization
+if (isAdmin && (hasUserViewPermission || hasPostingViewPermission)) {
+  menu.push("divider");
+}
+
+if (isAdmin || (hasReportingViewPermission)) {
 menu.push({
   icon: "BarChart",
   title: "Reports",
@@ -60,10 +69,8 @@ menu.push({
     },
   ],
 });
-// Add divider if we have items before Organization
-if (isAdmin && (hasUserViewPermission || hasPostingViewPermission)) {
-  menu.push("divider");
 }
+
 
 // Add Organization menu if user is admin
 if (isAdmin) {

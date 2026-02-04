@@ -115,12 +115,7 @@ export default function UsersListPage() {
         icon: "PencilLine",
         onClick: (row) => navigate(`/users/${row.id}/edit`),
       },
-      {
-        label: "Deactivate",
-        icon: "Trash2",
-        variant: "danger",
-        onClick: (row) => alert(`Deactivate user ${row.name} (ID: ${row.id})`),
-      },
+     
     ],
     [navigate]
   );
