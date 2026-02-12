@@ -9,6 +9,7 @@ interface Location {
 }
 
 export interface FormattedMenu extends Menu {
+  
   active?: boolean;
   activeDropdown?: boolean;
   subMenu?: FormattedMenu[];
@@ -53,6 +54,7 @@ const nestedMenu = (menu: Array<Menu | "divider">, location: Location) => {
         pathname: item.pathname,
         subMenu: item.subMenu,
         ignore: item.ignore,
+        url:item.url
       };
       menuItem.active =
         ((location.forceActiveMenu !== undefined &&

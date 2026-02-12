@@ -74,6 +74,13 @@ menu.push({
 
 // Add Organization menu if user is admin
 if (isAdmin) {
+
+  menu.push({
+    icon: "Activity",
+    title: "Activity",
+    url: "https://mepco.myflexihr.com/activitylog-ui",
+    
+  })
   menu.push({
     icon: "Building2",
     title: "Organization",

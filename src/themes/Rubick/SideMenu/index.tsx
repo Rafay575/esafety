@@ -29,7 +29,10 @@ function Main() {
   const menuStore = useAppSelector(selectMenu("side-menu"));
   const menu = () => nestedMenu(menuStore, location);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
+const openExternal = (url?: string) => {
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+};
   useEffect(() => {
     setFormattedMenu(menu());
 
@@ -37,6 +40,20 @@ function Main() {
       setWindowWidth(window.innerWidth);
     });
   }, [menuStore, location.pathname]);
+const handleMenuClick = (item: any) => (event: React.MouseEvent) => {
+  // ✅ External link -> open new tab
+  if (item?.url) {
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(item.url, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  // ✅ Normal internal navigation
+  event.preventDefault();
+  linkTo(item, navigate);
+  setFormattedMenu([...formattedMenu]);
+};
 
   return (
     <forceActiveMenuContext.Provider
@@ -70,168 +87,115 @@ function Main() {
             <div className="my-6 side-nav__divider"></div>
             <ul>
               {/* BEGIN: First Child */}
-              {formattedMenu.map((menu, menuKey) =>
-                menu == "divider" ? (
-                  <li className="my-6 side-nav__divider" key={menuKey}></li>
-                ) : (
-                  <li key={menuKey}>
-                    <Tippy
-                      as="a"
-                      content={menu.title}
-                      options={{
-                        placement: "right",
-                      }}
-                      disable={windowWidth > 1260}
-                      href={menu.subMenu ? "#" : menu.pathname}
-                      onClick={(event: React.MouseEvent) => {
-                        event.preventDefault();
-                        linkTo(menu, navigate);
-                        setFormattedMenu([...formattedMenu]);
-                      }}
-                      className={clsx([
-                        menu.active
-                          ? "side-menu side-menu--active"
-                          : "side-menu",
-                      ])}
-                    >
-                      <div className="side-menu__icon">
-                        <Lucide icon={menu.icon} />
-                      </div>
-                      <div className="side-menu__title">
-                        {menu.title}
-                        {menu.subMenu && (
-                          <div
-                            className={clsx([
-                              "side-menu__sub-icon",
-                              { "transform rotate-180": menu.activeDropdown },
-                            ])}
-                          >
-                            <Lucide icon="ChevronDown" />
-                          </div>
-                        )}
-                      </div>
-                    </Tippy>
-                    {/* BEGIN: Second Child */}
-                    {menu.subMenu && (
-                      <Transition
-                        in={menu.activeDropdown}
-                        onEnter={enter}
-                        onExit={leave}
-                        timeout={300}
+
+
+{formattedMenu.map((menu, menuKey) =>
+  menu == "divider" ? (
+    <li className="my-6 side-nav__divider" key={menuKey}></li>
+  ) : (
+    <li key={menuKey}>
+      <Tippy
+        as="a"
+        content={menu.title}
+        options={{ placement: "right" }}
+        disable={windowWidth > 1260}
+        href={menu.url ? menu.url : menu.subMenu ? "#" : menu.pathname}
+        target={menu.url ? "_blank" : undefined}
+        rel={menu.url ? "noopener noreferrer" : undefined}
+         onClick={handleMenuClick(menu)}
+        className={clsx([menu.active ? "side-menu side-menu--active" : "side-menu"])}
+      >
+        <div className="side-menu__icon">
+          <Lucide icon={menu.icon} />
+        </div>
+        <div className="side-menu__title">
+          {menu.title}
+          {menu.subMenu && (
+            <div
+              className={clsx([
+                "side-menu__sub-icon",
+                { "transform rotate-180": menu.activeDropdown },
+              ])}
+            >
+              <Lucide icon="ChevronDown" />
+            </div>
+          )}
+        </div>
+      </Tippy>
+
+      {/* BEGIN: Second Child */}
+      {menu.subMenu && (
+        <Transition in={menu.activeDropdown} onEnter={enter} onExit={leave} timeout={300}>
+          <ul className={clsx({ "side-menu__sub-open": menu.activeDropdown })}>
+            {menu.subMenu.map((subMenu, subMenuKey) => (
+              <li key={subMenuKey}>
+                <Tippy
+                  as="a"
+                  content={subMenu.title}
+                  options={{ placement: "right" }}
+                  disable={windowWidth > 1260}
+                  href={subMenu.url ? subMenu.url : subMenu.subMenu ? "#" : subMenu.pathname}
+                  target={subMenu.url ? "_blank" : undefined}
+                  rel={subMenu.url ? "noopener noreferrer" : undefined}
+                 onClick={handleMenuClick(subMenu)}
+                  className={clsx([subMenu.active ? "side-menu side-menu--active" : "side-menu"])}
+                >
+                  <div className="side-menu__icon">
+                    <Lucide icon={subMenu.icon} />
+                  </div>
+                  <div className="side-menu__title">
+                    {subMenu.title}
+                    {subMenu.subMenu && (
+                      <div
+                        className={clsx([
+                          "side-menu__sub-icon",
+                          { "transform rotate-180": subMenu.activeDropdown },
+                        ])}
                       >
-                        <ul
-                          className={clsx({
-                            "side-menu__sub-open": menu.activeDropdown,
-                          })}
-                        >
-                          {menu.subMenu.map((subMenu, subMenuKey) => (
-                            <li key={subMenuKey}>
-                              <Tippy
-                                as="a"
-                                content={subMenu.title}
-                                options={{
-                                  placement: "right",
-                                }}
-                                disable={windowWidth > 1260}
-                                href={subMenu.subMenu ? "#" : subMenu.pathname}
-                                onClick={(event: React.MouseEvent) => {
-                                  event.preventDefault();
-                                  linkTo(subMenu, navigate);
-                                  setFormattedMenu([...formattedMenu]);
-                                }}
-                                className={clsx([
-                                  subMenu.active
-                                    ? "side-menu side-menu--active"
-                                    : "side-menu",
-                                ])}
-                              >
-                                <div className="side-menu__icon">
-                                  <Lucide icon={subMenu.icon} />
-                                </div>
-                                <div className="side-menu__title">
-                                  {subMenu.title}
-                                  {subMenu.subMenu && (
-                                    <div
-                                      className={clsx([
-                                        "side-menu__sub-icon",
-                                        {
-                                          "transform rotate-180":
-                                            subMenu.activeDropdown,
-                                        },
-                                      ])}
-                                    >
-                                      <Lucide icon="ChevronDown" />
-                                    </div>
-                                  )}
-                                </div>
-                              </Tippy>
-                              {/* BEGIN: Third Child */}
-                              {subMenu.subMenu && (
-                                <Transition
-                                  in={subMenu.activeDropdown}
-                                  onEnter={enter}
-                                  onExit={leave}
-                                  timeout={300}
-                                >
-                                  <ul
-                                    className={clsx({
-                                      "side-menu__sub-open":
-                                        subMenu.activeDropdown,
-                                    })}
-                                  >
-                                    {subMenu.subMenu.map(
-                                      (lastSubMenu, lastSubMenuKey) => (
-                                        <li key={lastSubMenuKey}>
-                                          <Tippy
-                                            as="a"
-                                            content={lastSubMenu.title}
-                                            options={{
-                                              placement: "right",
-                                            }}
-                                            disable={windowWidth > 1260}
-                                            href={
-                                              lastSubMenu.subMenu
-                                                ? "#"
-                                                : lastSubMenu.pathname
-                                            }
-                                            onClick={(
-                                              event: React.MouseEvent
-                                            ) => {
-                                              event.preventDefault();
-                                              linkTo(lastSubMenu, navigate);
-                                              setFormattedMenu([
-                                                ...formattedMenu,
-                                              ]);
-                                            }}
-                                            className={clsx([
-                                              lastSubMenu.active
-                                                ? "side-menu side-menu--active"
-                                                : "side-menu",
-                                            ])}
-                                          >
-                                            <div className="side-menu__icon">
-                                              <Lucide icon={lastSubMenu.icon} />
-                                            </div>
-                                            <div className="side-menu__title">
-                                              {lastSubMenu.title}
-                                            </div>
-                                          </Tippy>
-                                        </li>
-                                      )
-                                    )}
-                                  </ul>
-                                </Transition>
-                              )}
-                              {/* END: Third Child */}
-                            </li>
-                          ))}
-                        </ul>
-                      </Transition>
+                        <Lucide icon="ChevronDown" />
+                      </div>
                     )}
-                    {/* END: Second Child */}
-                  </li>
-                )
-              )}
+                  </div>
+                </Tippy>
+
+                {/* BEGIN: Third Child */}
+                {subMenu.subMenu && (
+                  <Transition in={subMenu.activeDropdown} onEnter={enter} onExit={leave} timeout={300}>
+                    <ul className={clsx({ "side-menu__sub-open": subMenu.activeDropdown })}>
+                      {subMenu.subMenu.map((lastSubMenu, lastSubMenuKey) => (
+                        <li key={lastSubMenuKey}>
+                          <Tippy
+                            as="a"
+                            content={lastSubMenu.title}
+                            options={{ placement: "right" }}
+                            disable={windowWidth > 1260}
+                            href={lastSubMenu.url ? lastSubMenu.url : lastSubMenu.subMenu ? "#" : lastSubMenu.pathname}
+                            target={lastSubMenu.url ? "_blank" : undefined}
+                            rel={lastSubMenu.url ? "noopener noreferrer" : undefined}
+                           onClick={handleMenuClick(lastSubMenu)}
+                            className={clsx([lastSubMenu.active ? "side-menu side-menu--active" : "side-menu"])}
+                          >
+                            <div className="side-menu__icon">
+                              <Lucide icon={lastSubMenu.icon} />
+                            </div>
+                            <div className="side-menu__title">{lastSubMenu.title}</div>
+                          </Tippy>
+                        </li>
+                      ))}
+                    </ul>
+                  </Transition>
+                )}
+                {/* END: Third Child */}
+              </li>
+            ))}
+          </ul>
+        </Transition>
+      )}
+      {/* END: Second Child */}
+    </li>
+  )
+)}
+
               {/* END: First Child */}
             </ul>
           </nav>

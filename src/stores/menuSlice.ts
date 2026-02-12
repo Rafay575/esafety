@@ -13,6 +13,7 @@ export interface Menu {
   pathname?: string;
   subMenu?: Menu[];
   ignore?: boolean;
+  url?: string;
 }
 
 export interface MenuState {
