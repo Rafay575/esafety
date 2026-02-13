@@ -39,8 +39,8 @@ export default function ActivityTokenButton({
     setLoading(true);
    try {
         // Get signed URL from backend
-        const response = await fetch('https://mepco.myflexihr.com/api/generate-activitylog-url');
-        const data = await response.json();
+        const response = await api.get('https://mepco.myflexihr.com/api/generate-activitylog-url');
+        const data = await response.data ;
         
         // Open in new tab
         window.open(data.url, '_blank');
