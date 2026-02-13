@@ -78,7 +78,7 @@ if (isAdmin) {
   menu.push({
     icon: "Activity",
     title: "Activity",
-    url: "https://mepco.myflexihr.com/activitylog-ui",
+    pathname: "/activity-logs",
     
   })
   menu.push({
