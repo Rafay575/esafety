@@ -80,15 +80,15 @@ if (isAdmin || hasReportingViewPermission) {
 
 // Add Organization menu if user is admin
 if (isAdmin) {
-  const baseActivityUrl = "https://mepco.myflexihr.com/activitylog-ui";
-  const activityUrl = authToken
-    ? `${baseActivityUrl}?token=${encodeURIComponent(authToken)}`
-    : baseActivityUrl;
+  // const baseActivityUrl = "https://mepco.myflexihr.com/activitylog-ui";
+  // const activityUrl = authToken
+  //   ? `${baseActivityUrl}?token=${encodeURIComponent(authToken)}`
+  //   : baseActivityUrl;
 
   menu.push({
     icon: "Activity",
     title: "Activity",
-    url: activityUrl,
+    url: "https://mepco.myflexihr.com/activitylog-ui",
   });
 
   menu.push({
