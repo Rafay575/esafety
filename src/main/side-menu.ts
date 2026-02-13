@@ -8,7 +8,15 @@ const getUserFromStorage = () => {
   return userStr ? JSON.parse(userStr) : null;
 };
 
+// Get token from localStorage
+const getAuthTokenFromStorage = () => {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("auth_token") || ""; // adjust key if yours is different
+};
+
 const user = getUserFromStorage();
+const authToken = getAuthTokenFromStorage();
+
 const isAdmin = user?.roles?.includes("Admin") || false;
 const hasUserViewPermission =
   user?.permissions?.includes("users.view.any") || false;
@@ -37,7 +45,6 @@ if (hasPostingViewPermission) {
 }
 
 // Add E-Safety menu (always visible for now)
-
 menu.push({
   icon: "FileType",
   title: "E-Safety (PTW)",
@@ -57,52 +64,43 @@ if (isAdmin && (hasUserViewPermission || hasPostingViewPermission)) {
   menu.push("divider");
 }
 
-if (isAdmin || (hasReportingViewPermission)) {
-menu.push({
-  icon: "BarChart",
-  title: "Reports",
-  subMenu: [
-    {
-      icon: "TrendingUp",
-      title: "Esafety Performance",
-      pathname: "/reports/esafety-performance",
-    },
-  ],
-});
+if (isAdmin || hasReportingViewPermission) {
+  menu.push({
+    icon: "BarChart",
+    title: "Reports",
+    subMenu: [
+      {
+        icon: "TrendingUp",
+        title: "Esafety Performance",
+        pathname: "/reports/esafety-performance",
+      },
+    ],
+  });
 }
-
 
 // Add Organization menu if user is admin
 if (isAdmin) {
+  const baseActivityUrl = "https://mepco.myflexihr.com/activitylog-ui";
+  const activityUrl = authToken
+    ? `${baseActivityUrl}?token=${encodeURIComponent(authToken)}`
+    : baseActivityUrl;
 
   menu.push({
     icon: "Activity",
     title: "Activity",
-    url: "https://mepco.myflexihr.com/activitylog-ui",
-    
-  })
+    url: activityUrl,
+  });
+
   menu.push({
     icon: "Building2",
     title: "Organization",
     subMenu: [
       { icon: "Map", title: "Regions", pathname: "/organization/regions" },
       { icon: "Circle", title: "Circles", pathname: "/organization/circles" },
-      {
-        icon: "Layers",
-        title: "Divisions",
-        pathname: "/organization/divisions",
-      },
-      {
-        icon: "GitBranch",
-        title: "Sub-Divisions",
-        pathname: "/organization/subdivisions",
-      },
+      { icon: "Layers", title: "Divisions", pathname: "/organization/divisions" },
+      { icon: "GitBranch", title: "Sub-Divisions", pathname: "/organization/subdivisions" },
       { icon: "Zap", title: "Feeders", pathname: "/organization/feeders" },
-      {
-        icon: "Antenna",
-        title: "Transformer",
-        pathname: "/organization/transformer",
-      },
+      { icon: "Antenna", title: "Transformer", pathname: "/organization/transformer" },
       { icon: "Zap", title: "Grid", pathname: "/organization/grid" },
     ],
   });
