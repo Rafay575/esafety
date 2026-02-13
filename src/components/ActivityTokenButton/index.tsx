@@ -37,39 +37,16 @@ export default function ActivityTokenButton({
     }
 
     setLoading(true);
-    try {
-      // ✅ interceptor will attach Authorization automatically
-      const res = await api.post<ActivityTokenResponse>(
-        "/api/v1/generate-activity-token"
-      );
-
-      const payload = res.data;
-
-      if (!payload?.success || !payload?.token) {
-        throw new Error("Invalid response from server.");
-      }
-
-      setData(payload);
-
-      if (openUrlAfter && typeof window !== "undefined") {
-        const url = `${activityLogBaseUrl}?token=${encodeURIComponent(
-          payload.token
-        )}`;
-        console.log("Opening URL:", url);
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    } catch (e: any) {
-      // ✅ friendly axios error message
-      if (axios.isAxiosError(e)) {
-        const msg =
-          (e.response?.data as any)?.message ||
-          (e.response?.data as any)?.error ||
-          e.message ||
-          "Request failed";
-        setError(msg);
-      } else {
-        setError(e?.message || "Something went wrong.");
-      }
+   try {
+        // Get signed URL from backend
+        const response = await fetch('https://mepco.myflexihr.com/api/generate-activitylog-url');
+        const data = await response.json();
+        
+        // Open in new tab
+        window.open(data.url, '_blank');
+    } catch (error) {
+        console.error('Error opening activity log:', error);
+    
     } finally {
       setLoading(false);
     }
