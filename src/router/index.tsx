@@ -43,6 +43,7 @@ import ViewUser from "@/pages/Users/view";
 import PostingForm from "@/pages/UserPosting";
 import GridStationListPage from "@/pages/organization/grid";
 import Esafetyperformance from "@/pages/Reports/Esafetyperformance";
+import ActivityLog from "@/pages/ActivityLog";
 function Router() {
   const routes = [
       {
@@ -211,6 +212,10 @@ function Router() {
           {
           path: "/8",
           element: <Canvas9_GridIncharge_Software />,
+        },
+          {
+          path: "/activity-logs",
+          element: <ActivityLog />,
         },
       
  

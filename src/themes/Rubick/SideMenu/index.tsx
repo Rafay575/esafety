@@ -40,62 +40,17 @@ const openExternal = (url?: string) => {
       setWindowWidth(window.innerWidth);
     });
   }, [menuStore, location.pathname]);
-const handleMenuClick = (item: any) => async (event: React.MouseEvent) => {
-  event.preventDefault();
-  event.stopPropagation();
-
-  // ✅ Special handling for Activity Log (Admin only)
-  if (item?.title === "Activity" || item?.pathname === "/activity-log") {
-    try {
-      const authToken = localStorage.getItem('auth_token');
-      
-      if (!authToken) {
-        alert('Please login first');
-        return;
-      }
-
-      // Show loading indicator (optional)
-      // setLoading(true);
-
-      // Generate temporary access token from backend
-      const response = await fetch('https://mepco.myflexihr.com/api/v1/generate-activity-token', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.token) {
-        // Open activity log with temporary token
-        const url = item?.url || "";
-      if (typeof window !== "undefined") {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
-      } else {
-        console.error('Failed to generate activity token:', data);
-        alert('Failed to open activity logs. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error generating activity token:', error);
-      alert('An error occurred while opening activity logs.');
-    } finally {
-      // setLoading(false);
-    }
-    return;
-  }
-
+const handleMenuClick = (item: any) => (event: React.MouseEvent) => {
   // ✅ External link -> open new tab
   if (item?.url) {
+    event.preventDefault();
+    event.stopPropagation();
     window.open(item.url, "_blank", "noopener,noreferrer");
     return;
   }
-  
+
   // ✅ Normal internal navigation
+  event.preventDefault();
   linkTo(item, navigate);
   setFormattedMenu([...formattedMenu]);
 };
