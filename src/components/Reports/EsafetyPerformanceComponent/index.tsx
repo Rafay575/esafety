@@ -153,26 +153,63 @@ const Main = () => {
   };
 
 
-const loadImageAsDataURL = async (url: string): Promise<string> => {
-  const res = await fetch(url);
-  const blob = await res.blob();
+// const loadImageAsDataURL = async (url: string): Promise<string> => {
+//   const res = await fetch(url);
+//   const blob = await res.blob();
 
-  return await new Promise((resolve) => {
+//   return await new Promise((resolve) => {
+//     const img = new Image();
+//     img.onload = () => {
+//       const canvas = document.createElement("canvas");
+//       canvas.width = img.width;
+//       canvas.height = img.height;
+
+//       const ctx = canvas.getContext("2d");
+//       ctx?.drawImage(img, 0, 0);
+
+//       // 🔥 reduce quality to 0.6
+//       const compressed = canvas.toDataURL("image/jpeg", 0.6);
+//       resolve(compressed);
+//     };
+
+//     img.src = URL.createObjectURL(blob);
+//   });
+// };
+
+const loadPngAsResizedDataURL = async (
+  url: string,
+  targetMaxWidthPx = 220
+): Promise<string> => {
+  const res = await fetch(url, { cache: "force-cache" });
+  if (!res.ok) throw new Error(`Failed to load image: ${url}`);
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  return await new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
+
     img.onload = () => {
+      const scale = Math.min(1, targetMaxWidthPx / img.width);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = w;
+      canvas.height = h;
 
       const ctx = canvas.getContext("2d");
-      ctx?.drawImage(img, 0, 0);
+      ctx?.clearRect(0, 0, w, h); // ✅ keep transparency
+      ctx?.drawImage(img, 0, 0, w, h);
 
-      // 🔥 reduce quality to 0.6
-      const compressed = canvas.toDataURL("image/jpeg", 0.6);
-      resolve(compressed);
+      URL.revokeObjectURL(objectUrl);
+
+      resolve(canvas.toDataURL("image/png")); // ✅ PNG output
     };
 
-    img.src = URL.createObjectURL(blob);
+    img.onerror = reject;
+    img.src = objectUrl;
   });
 };
 
@@ -199,19 +236,21 @@ const handleDownloadPDF = async () => {
     const pageWidth = pdf.internal.pageSize.getWidth();
 
     // ✅ load logo
-    let logoDataUrl: string | null = null;
-    try {
-      logoDataUrl = await loadImageAsDataURL("/logo.png");
-    } catch (e) {
-      console.warn("Logo load failed, continuing without logo.", e);
-    }
+   let logoDataUrl: string | null = null;
+try {
+  logoDataUrl = await loadPngAsResizedDataURL("/logo.png", 150);
+} catch (e) {
+  console.warn("Logo load failed, continuing without logo.", e);
+}
+
 
     // --- header layout ---
     const headerTop = 10;
 
     // ✅ Draw logo top-left
     if (logoDataUrl) {
-      pdf.addImage(logoDataUrl, "JPEG", 10, headerTop - 4, 22, 22, undefined, "FAST");
+      pdf.addImage(logoDataUrl, "PNG", 10, headerTop - 4, 22, 22);
+
 
     }
 
