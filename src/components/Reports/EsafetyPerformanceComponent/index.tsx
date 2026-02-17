@@ -13,7 +13,6 @@ import autoTable from "jspdf-autotable";
 // Install these packages first:
 // npm install jspdf html2canvas
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 const Main = () => {
   const report = useESafetyReportCount();
@@ -156,16 +155,27 @@ const Main = () => {
 
 const loadImageAsDataURL = async (url: string): Promise<string> => {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to load image: ${url}`);
   const blob = await res.blob();
 
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+  return await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0);
+
+      // 🔥 reduce quality to 0.6
+      const compressed = canvas.toDataURL("image/jpeg", 0.6);
+      resolve(compressed);
+    };
+
+    img.src = URL.createObjectURL(blob);
   });
 };
+
 
 
 const handleDownloadPDF = async () => {
@@ -178,7 +188,14 @@ const handleDownloadPDF = async () => {
 
   try {
     // ✅ landscape A4
-    const pdf = new jsPDF("l", "mm", "a4");
+    const pdf = new jsPDF({
+  orientation: "landscape",
+  unit: "mm",
+  format: "a4",
+  compress: true,       // 🔥 VERY IMPORTANT
+  precision: 2,         // reduces internal float precision
+});
+
     const pageWidth = pdf.internal.pageSize.getWidth();
 
     // ✅ load logo
@@ -194,7 +211,8 @@ const handleDownloadPDF = async () => {
 
     // ✅ Draw logo top-left
     if (logoDataUrl) {
-      pdf.addImage(logoDataUrl, "PNG", 10, headerTop - 4, 22, 22);
+      pdf.addImage(logoDataUrl, "JPEG", 10, headerTop - 4, 22, 22, undefined, "FAST");
+
     }
 
     // ✅ reserve space for logo on the left so filters won't overlap

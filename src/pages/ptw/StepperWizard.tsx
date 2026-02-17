@@ -11,12 +11,11 @@ import {
 } from "lucide-react";
 import Button from "@/components/Base/Button";
 
-import PTW_SingleForm_BilingualLabels from "../new/index9";
-import SituationOfLine from "../new";
-import HazardIdentificationChecklist from "../new/index1";
-import SafetyPrecautions from "../new/index2";
-import LSInstructionsAckSoftware from "../new/index4";
-import PTWPreview from "../new/PTWPreview"; // ✅ Your preview component path
+import PTW_SingleForm_BilingualLabels from "../new/step1";
+import SituationOfLine from "../new/step2";
+import HazardIdentificationChecklist from "../new/step3";
+
+import PTWPreview from "../new/step4"; // ✅ Your preview component path
 
 const STEPS = [
   { id: 1, title: "Part A – Basic Information", ur: "حصہ اوّل – بنیادی معلومات", icon: ClipboardList },

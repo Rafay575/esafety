@@ -10,6 +10,7 @@ import PlannedScheduleModal, {
   PlannedScheduleRow,
 } from "@/components/PlannedScheduleModal";
 import { useJsApiLoader, GoogleMap, Marker } from "@react-google-maps/api";
+import { Loader } from "lucide-react";
 
 // ---------- Types ----------
 type Feeder = { id: number; name: string; code: string };
@@ -23,11 +24,7 @@ type PtwType = "MISC" | "PLANNED" | "EMERGENCY";
 
 // ---------- Google Maps API key helper ----------
 const getGoogleMapsApiKey = (): string => {
-  // Next.js style
-  // if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-  //   return process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  // }
-  // Vite style (must be prefixed with VITE_)
+ 
   if (typeof import.meta !== 'undefined' && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
     return import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   }
@@ -84,23 +81,11 @@ export default function PTW_SingleForm_BilingualLabels({
     current_date: today,
     type: "MISC" as PtwType,
     misc_type: "",
-    reference_no: "",
-    circuit_type: "SINGLE" as "SINGLE" | "MULTI",
-
     sub_division_id: "", // stringified ID
     feeder_id: "", // stringified ID (primary feeder)
     secondary_feeder_ids: [] as number[], // only for MULTI
-    is_ptw_required: "YES" as "YES" | "NO",
-
-    // planned fields
-    planned_from_date: "",
-    planned_to_date: "",
-    planned_schedule: [] as PlannedScheduleRow[],
-
     transformer_id: "", // stringified ID
     feeder_incharge_name: "",
-    close_feeder: "",
-    alternate_feeder: "",
     location_text: "",
     location_lat: "",
     location_lng: "",
@@ -112,6 +97,16 @@ export default function PTW_SingleForm_BilingualLabels({
     switch_off_time: "", // HH:mm
     restore_time: "",
     team_member_ids: [] as number[],
+    reference_no: "",
+    is_ptw_required: "YES" as "YES" | "NO",
+    planned_from_date: "",
+    planned_to_date: "",
+    planned_schedule: [] as PlannedScheduleRow[],
+
+    circuit_type: "SINGLE" as "SINGLE" | "MULTI",
+
+
+    
     evidences: [null, null, null] as (File | null)[],
     existing_evidences: [] as { id: number; file_path: string; type: string }[],
   });
@@ -575,7 +570,7 @@ export default function PTW_SingleForm_BilingualLabels({
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center text-gray-600">
-        Loading PTW context...
+        <Loader className="animate-spin" size={48} />
       </div>
     );
 

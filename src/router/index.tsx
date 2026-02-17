@@ -32,10 +32,10 @@ import DivisionsListPage from "@/pages/organization/divisions";
 import SubDivisionsListPage from "@/pages/organization/subdivisions";
 import FeederListPage from "@/pages/organization/feeders";
 import TransformerListPage  from "@/pages/organization/transformer";
-import PTW_Issuer_Software from "@/pages/new/index5";
-import IssuerInstructionsAck_Software from "@/pages/new/index6";
-import CancellationRequest_Software from "@/pages/new/index7";
-import Canvas9_GridIncharge_Software from "@/pages/new/index8";
+// import PTW_Issuer_Software from "@/pages/new/index5";
+// import IssuerInstructionsAck_Software from "@/pages/new/index6";
+// import CancellationRequest_Software from "@/pages/new/index7";
+// import Canvas9_GridIncharge_Software from "@/pages/new/index8";
 import PTW_StepperWizard from "@/pages/ptw/StepperWizard";
 import PTWPreviewPage from "@/pages/new/PTWPreviewPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -197,22 +197,7 @@ function Router() {
           element: <PTW_StepperWizard />,
         },
     
-        {
-          path: "/5",
-          element: <PTW_Issuer_Software />,
-        },
-          {
-          path: "/6",
-          element: <IssuerInstructionsAck_Software />,
-        },
-          {
-          path: "/7",
-          element: <CancellationRequest_Software />,
-        },
-          {
-          path: "/8",
-          element: <Canvas9_GridIncharge_Software />,
-        },
+      
           {
           path: "/activity-logs",
           element: <ActivityLog />,
