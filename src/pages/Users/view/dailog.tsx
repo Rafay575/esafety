@@ -117,12 +117,7 @@ export function CreatePostingModal({
     return true;
   };
 
-  const validateSubDivision = (value: number) => {
-    if (!isGridPosting && (!value || value === 0)) {
-      return "Sub Division is required";
-    }
-    return true;
-  };
+
 
   const validateGrid = (value: number) => {
     if (isGridPosting && (!value || value === 0)) {
@@ -462,10 +457,7 @@ export function CreatePostingModal({
                   <Controller
                     name="sub_division_id"
                     control={control}
-                    rules={{
-                      required: "Sub Division is required",
-                      validate: validateSubDivision
-                    }}
+                
                     render={({ field, fieldState: { error } }) => (
                       <div>
                         <SearchSelect
