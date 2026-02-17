@@ -22,8 +22,6 @@ const STEPS = [
   { id: 1, title: "Part A – Basic Information", ur: "حصہ اوّل – بنیادی معلومات", icon: ClipboardList },
   { id: 2, title: "Situation of Line", ur: "لائن کی صورتحال", icon: ActivitySquare },
   { id: 3, title: "Safety Hazards", ur: "حفاظتی خطرات", icon: ShieldAlert },
-  { id: 4, title: "Safety Precautions", ur: "حفاظتی اقدامات", icon: ShieldCheck },
-  { id: 5, title: "LS Instructions & Acknowledgment", ur: "ایل ایس ہدایات و تصدیق", icon: UserCheck },
   { id: 6, title: "PTW Preview", ur: "جائزہ", icon: FileSearch }, // ✅ NEW STEP
 ] as const;
 
@@ -46,10 +44,7 @@ export default function PTW_StepperWizardFinal() {
         return <SituationOfLine id={id} next={next} back={back} />;
       case 3:
         return <HazardIdentificationChecklist id={id} next={next} back={back} />;
-      case 4:
-        return <SafetyPrecautions id={id} next={next} back={back} />;
-      case 5:
-        return <LSInstructionsAckSoftware next={next} back={back} />;
+    
       case 6:
         return <PTWPreview id={id} back={back}/>; // ✅ PREVIEW STEP
       default:
@@ -66,7 +61,7 @@ export default function PTW_StepperWizardFinal() {
             <h1 className="text-xl font-semibold tracking-tight text-slate-800 flex items-center gap-2">
               <span className="text-primary font-bold">PTW</span> Step {step} / {STEPS.length}
             </h1>
-            <p className="text-xs text-slate-500" dir="rtl">
+            <p className="text-base font-urdu text-slate-500" dir="rtl">
               ورک پرمٹ – مرحلہ {step} از {STEPS.length}
             </p>
           </div>
@@ -124,7 +119,7 @@ export default function PTW_StepperWizardFinal() {
       </header>
 
       {/* ---------- BODY ---------- */}
-      <main className="relative mx-auto max-w-6xl px-4 pt-6">
+      <main className="relative mx-auto max-w-6xl px-4 py-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={step}

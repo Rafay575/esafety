@@ -54,3 +54,18 @@
 .table-report tbody tr:hover {
   background-color: #f1f5f9; /* bg-slate-100 */
 }
+
+@font-face {
+  font-family: "JameelNoori";
+  src: url("/fonts/Jameel Noori Nastaleeq Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* utility class for urdu text */
+.font-urdu {
+  font-family: "JameelNoori", serif;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}

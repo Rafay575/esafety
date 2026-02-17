@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
+import { Check, Search, X } from "lucide-react";
 
 export type SearchSelectItem = {
   id: number | string;
@@ -232,7 +233,7 @@ export default function SearchSelect({
         <div className={clsx("flex items-center gap-2", sizeCls)}>
           {/* left icon */}
           <div className="text-slate-400">
-            🔎
+            <Search />
           </div>
 
           {/* input always visible (single + multi) */}
@@ -311,7 +312,7 @@ export default function SearchSelect({
                   }}
                   aria-label={`Remove ${it.label}`}
                 >
-                  ×
+                  <X size={12} />
                 </button>
               </span>
             ))}
@@ -366,7 +367,7 @@ export default function SearchSelect({
                     </div>
 
                     {sel ? (
-                      <span className="text-xs font-semibold text-primary mt-1">✓</span>
+                      <span className="text-xs font-semibold text-primary mt-1"><Check /></span>
                     ) : null}
                   </button>
                 );

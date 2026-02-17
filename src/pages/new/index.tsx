@@ -41,20 +41,19 @@ export default function SituationOfLine({
         const checklistData = res.data?.data ?? [];
 
         // 🟢 Step 2: Fetch existing answers from PTW preview
-        const preview = await api.get(`/api/v1/ptw/${id}/preview`);
-        const existingAnswers =
-          preview.data?.data?.checklists?.LINE_TYPE ?? [];
+        // const preview = await api.get(`/api/v1/ptw/${id}/preview`);
+        const existingAnswers = [];
 
         // 🟢 Step 3: Convert existing answers → { [itemId]: value }
-        const prefilled: Record<number, string> = {};
-        existingAnswers.forEach(
-          (a: { id: number; value: string | null }) => {
-            if (a.value) prefilled[a.id] = a.value;
-          }
-        );
+        // const prefilled: Record<number, string> = {};
+        // existingAnswers.forEach(
+        //   (a: { id: number; value: string | null }) => {
+        //     if (a.value) prefilled[a.id] = a.value;
+        //   }
+        // );
 
         setChecklist(checklistData);
-        setAnswers(prefilled);
+        setAnswers([]);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load checklist or preview data");
@@ -95,6 +94,7 @@ export default function SituationOfLine({
     } catch (err) {
       console.error(err);
       toast.error("Failed to save checklist");
+      next();
     }
   };
 
@@ -123,7 +123,7 @@ export default function SituationOfLine({
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div>
             <h1 className="text-xl font-semibold">{group.title_en}</h1>
-            <p className="text-xs opacity-70" dir="rtl">
+            <p className="text-base font-urdua opacity-70 " dir="rtl">
               {group.title_ur}
             </p>
           </div>
@@ -143,7 +143,7 @@ export default function SituationOfLine({
                   {it.label_en}
                 </div>
                 <div
-                  className="text-xs text-slate-600 opacity-80 mb-2"
+                  className="text-sm text-slate-600 opacity-80 mb-2 font-urdu"
                   dir="rtl"
                 >
                   {it.label_ur}
