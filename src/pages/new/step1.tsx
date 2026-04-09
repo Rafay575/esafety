@@ -1,5 +1,8 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
+import { useForm, Controller, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { FormInput, FormSelect, FormTextarea } from "@/components/Base/Form";
 import FormLabel from "@/components/Base/Form/FormLabel";
 import Button from "@/components/Base/Button";
@@ -22,20 +25,56 @@ type Transformer = {
 type TeamMember = { id: number; name: string; avatar_url: string };
 type PtwType = "MISC" | "PLANNED" | "EMERGENCY";
 
-// ---------- Google Maps API key helper ----------
+// ---------- Zod validation schema ----------
+const formSchema = z.object({
+  current_date: z.string(),
+  type: z.enum(["MISC", "PLANNED", "EMERGENCY"]),
+  misc_type: z.string().optional(),
+  reference_no: z.string().optional(),
+  circuit_type: z.enum(["SINGLE", "MULTI"]),
+  sub_division_id: z.string(),
+  feeder_id: z.string().min(1, "Primary feeder is required"),
+  secondary_feeder_ids: z.array(z.number()).default([]),
+  is_ptw_required: z.enum(["YES", "NO"]),
+  planned_from_date: z.string().optional(),
+  planned_to_date: z.string().optional(),
+  planned_schedule: z.array(z.any()).default([]),
+  transformer_id: z.string().min(1, "Transformer is required"),
+  feeder_incharge_name: z.string().min(1, "Feeder incharge name is required"),
+  location_text: z.string(),
+  location_lat: z.string(),
+  location_lng: z.string(),
+  place_of_work: z.string().min(1, "Place of work is required"),
+  scope_of_work: z.string().min(1, "Scope of work is required"),
+  safety_arrangements: z.string().min(1, "Safety arrangements are required"),
+  scheduled_start_at: z.string().optional(),
+  estimated_duration_min: z
+    .string()
+    .min(1, "Duration is required")
+    .refine((val) => Number(val) >= 15, "Duration must be at least 15 minutes"),
+  switch_off_time: z.string().min(1, "Switch off time is required"),
+  restore_time: z.string().min(1, "Restore time is required"),
+  team_member_ids: z.array(z.number()).default([]),
+});
+
+type FormData = z.infer<typeof formSchema>;
+
 const getGoogleMapsApiKey = (): string => {
- 
-  if (typeof import.meta !== 'undefined' && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+  if (
+    typeof import.meta !== "undefined" &&
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  ) {
     return import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   }
-  console.error("Google Maps API key is missing. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY or VITE_GOOGLE_MAPS_API_KEY");
+  console.error(
+    "Google Maps API key is missing. Please set VITE_GOOGLE_MAPS_API_KEY",
+  );
   return "";
 };
 
 const mapContainerStyle = { width: "100%", height: "300px" };
 const defaultCenter = { lat: 33.6844, lng: 73.0479 }; // fallback (Islamabad)
 
-// ---------- Main Component ----------
 export default function PTW_SingleForm_BilingualLabels({
   setId,
   next,
@@ -46,22 +85,63 @@ export default function PTW_SingleForm_BilingualLabels({
   id?: number;
 }) {
   const [loading, setLoading] = useState(true);
-
   const [context, setContext] = useState<{
     sub_division?: { id: number; name: string };
     primary_feeders: Feeder[];
     secondary_feeders: Feeder[];
     team_members: TeamMember[];
   }>({ primary_feeders: [], secondary_feeders: [], team_members: [] });
-
   const [transformers, setTransformers] = useState<Transformer[]>([]);
   const [plannedOpen, setPlannedOpen] = useState(false);
-
-  // remember preview names so we can map -> IDs when lists load
   const [previewNames, setPreviewNames] = useState<{
     feederName?: string;
     transformerName?: string;
   }>({});
+
+  // ---------- React Hook Form ----------
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      current_date: new Date().toISOString().split("T")[0],
+      type: "MISC",
+      misc_type: "",
+      reference_no: "",
+      circuit_type: "SINGLE",
+      sub_division_id: "",
+      feeder_id: "",
+      secondary_feeder_ids: [],
+      is_ptw_required: "YES",
+      planned_from_date: "",
+      planned_to_date: "",
+      planned_schedule: [],
+      transformer_id: "",
+      feeder_incharge_name: "",
+      location_text: "",
+      location_lat: "",
+      location_lng: "",
+      place_of_work: "",
+      scope_of_work: "",
+      safety_arrangements: "",
+      scheduled_start_at: "",
+      estimated_duration_min: "",
+      switch_off_time: "",
+      restore_time: "",
+      team_member_ids: [],
+    },
+  });
+
+  // Watch values needed for conditional logic
+  const watchType = watch("type");
+  const watchIsPtwRequired = watch("is_ptw_required");
+  const watchCircuitType = watch("circuit_type");
+  const watchFeederId = watch("feeder_id");
+  const watchPlannedSchedule = watch("planned_schedule");
 
   // ---------- Google Maps state ----------
   const { isLoaded, loadError } = useJsApiLoader({
@@ -74,48 +154,25 @@ export default function PTW_SingleForm_BilingualLabels({
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const today = new Date().toISOString().split("T")[0];
-
-  // ---------- Form state ----------
-  const [form, setForm] = useState({
-    current_date: today,
-    type: "MISC" as PtwType,
-    misc_type: "",
-    sub_division_id: "", // stringified ID
-    feeder_id: "", // stringified ID (primary feeder)
-    secondary_feeder_ids: [] as number[], // only for MULTI
-    transformer_id: "", // stringified ID
-    feeder_incharge_name: "",
-    location_text: "",
-    location_lat: "",
-    location_lng: "",
-    place_of_work: "",
-    scope_of_work: "",
-    safety_arrangements: "",
-    scheduled_start_at: "", // YYYY-MM-DDTHH:mm
-    estimated_duration_min: "", // numeric as string
-    switch_off_time: "", // HH:mm
-    restore_time: "",
-    team_member_ids: [] as number[],
-    reference_no: "",
-    is_ptw_required: "YES" as "YES" | "NO",
-    planned_from_date: "",
-    planned_to_date: "",
-    planned_schedule: [] as PlannedScheduleRow[],
-
-    circuit_type: "SINGLE" as "SINGLE" | "MULTI",
-
-
-    
-    evidences: [null, null, null] as (File | null)[],
-    existing_evidences: [] as { id: number; file_path: string; type: string }[],
+  // Local marker state (syncs with form)
+  const [markerPosition, setMarkerPosition] = useState(() => {
+    const lat = watch("location_lat");
+    const lng = watch("location_lng");
+    if (lat && lng) {
+      return { lat: parseFloat(lat), lng: parseFloat(lng) };
+    }
+    return defaultCenter;
   });
+  const [address, setAddress] = useState(watch("location_text"));
 
-  const formatTime = (t: string) => {
-    if (!t) return "";
-    const [h, m] = t.split(":");
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  };
+  // Update marker when form lat/lng change (e.g., from auto-fetch)
+  useEffect(() => {
+    const lat = watch("location_lat");
+    const lng = watch("location_lng");
+    if (lat && lng) {
+      setMarkerPosition({ lat: parseFloat(lat), lng: parseFloat(lng) });
+    }
+  }, [watch("location_lat"), watch("location_lng")]);
 
   // ---------- Google Maps initialisation ----------
   useEffect(() => {
@@ -124,30 +181,11 @@ export default function PTW_SingleForm_BilingualLabels({
     }
   }, [isLoaded]);
 
-  // Local marker state (syncs with form)
-  const [markerPosition, setMarkerPosition] = useState(() => {
-    if (form.location_lat && form.location_lng) {
-      return { lat: parseFloat(form.location_lat), lng: parseFloat(form.location_lng) };
-    }
-    return defaultCenter;
-  });
-  const [address, setAddress] = useState(form.location_text);
-
-  // Update marker when form lat/lng change (e.g., from auto-fetch)
-  useEffect(() => {
-    if (form.location_lat && form.location_lng) {
-      setMarkerPosition({
-        lat: parseFloat(form.location_lat),
-        lng: parseFloat(form.location_lng),
-      });
-    }
-  }, [form.location_lat, form.location_lng]);
-
   // Auto‑fetch location when map loads (only for new PTWs and if fields are empty)
   useEffect(() => {
     if (!isLoaded || !map || !geocoderRef.current) return;
     if (id) return; // skip for existing PTWs
-    if (form.location_lat && form.location_lng && form.location_text) return;
+    if (watch("location_lat") && watch("location_lng") && watch("location_text")) return;
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -164,37 +202,33 @@ export default function PTW_SingleForm_BilingualLabels({
               if (status === "OK" && results?.[0]) {
                 const address = results[0].formatted_address;
                 setAddress(address);
-                setForm((prev) => ({
-                  ...prev,
-                  location_lat: latitude.toFixed(6),
-                  location_lng: longitude.toFixed(6),
-                  location_text: address,
-                }));
+                setValue("location_lat", latitude.toFixed(6));
+                setValue("location_lng", longitude.toFixed(6));
+                setValue("location_text", address);
                 toast.success("📍 Location auto-fetched");
               } else {
                 // fallback to coordinates
                 const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
                 setAddress(fallback);
-                setForm((prev) => ({
-                  ...prev,
-                  location_lat: latitude.toFixed(6),
-                  location_lng: longitude.toFixed(6),
-                  location_text: fallback,
-                }));
+                setValue("location_lat", latitude.toFixed(6));
+                setValue("location_lng", longitude.toFixed(6));
+                setValue("location_text", fallback);
               }
-            }
+            },
           );
         },
         (err) => {
           console.warn("Geolocation error:", err);
-          toast.error("Unable to fetch your location. You can drag the marker to set it.");
+          toast.error(
+            "Unable to fetch your location. You can drag the marker to set it.",
+          );
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 10000 },
       );
     } else {
       toast.error("Geolocation not supported by this browser");
     }
-  }, [isLoaded, map, id, form.location_lat, form.location_lng, form.location_text]);
+  }, [isLoaded, map, id, watch("location_lat"), watch("location_lng"), watch("location_text")]);
 
   // Marker drag handler
   const onMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
@@ -207,27 +241,24 @@ export default function PTW_SingleForm_BilingualLabels({
 
     debounceTimerRef.current = setTimeout(() => {
       if (geocoderRef.current) {
-        geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
-          if (status === "OK" && results?.[0]) {
-            const newAddress = results[0].formatted_address;
-            setAddress(newAddress);
-            setForm((prev) => ({
-              ...prev,
-              location_lat: lat.toFixed(6),
-              location_lng: lng.toFixed(6),
-              location_text: newAddress,
-            }));
-          } else {
-            const fallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-            setAddress(fallback);
-            setForm((prev) => ({
-              ...prev,
-              location_lat: lat.toFixed(6),
-              location_lng: lng.toFixed(6),
-              location_text: fallback,
-            }));
-          }
-        });
+        geocoderRef.current.geocode(
+          { location: { lat, lng } },
+          (results, status) => {
+            if (status === "OK" && results?.[0]) {
+              const newAddress = results[0].formatted_address;
+              setAddress(newAddress);
+              setValue("location_lat", lat.toFixed(6));
+              setValue("location_lng", lng.toFixed(6));
+              setValue("location_text", newAddress);
+            } else {
+              const fallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+              setAddress(fallback);
+              setValue("location_lat", lat.toFixed(6));
+              setValue("location_lng", lng.toFixed(6));
+              setValue("location_text", fallback);
+            }
+          },
+        );
       }
     }, 300);
   };
@@ -240,7 +271,9 @@ export default function PTW_SingleForm_BilingualLabels({
   const [searchInput, setSearchInput] = useState("");
   useEffect(() => {
     if (!isLoaded || !map) return;
-    const input = document.getElementById("map-search-input") as HTMLInputElement;
+    const input = document.getElementById(
+      "map-search-input",
+    ) as HTMLInputElement;
     if (!input) return;
 
     const autocomplete = new window.google.maps.places.Autocomplete(input, {
@@ -256,18 +289,15 @@ export default function PTW_SingleForm_BilingualLabels({
       const lng = place.geometry.location.lng();
       setMarkerPosition({ lat, lng });
       setAddress(place.formatted_address || "");
-      setForm((prev) => ({
-        ...prev,
-        location_lat: lat.toFixed(6),
-        location_lng: lng.toFixed(6),
-        location_text: place.formatted_address || "",
-      }));
+      setValue("location_lat", lat.toFixed(6));
+      setValue("location_lng", lng.toFixed(6));
+      setValue("location_text", place.formatted_address || "");
       map.panTo({ lat, lng });
       map.setZoom(15);
     });
 
     return () => google.maps.event.clearInstanceListeners(autocomplete);
-  }, [isLoaded, map]);
+  }, [isLoaded, map, setValue]);
 
   // ---------- Load context + optionally hydrate from preview ----------
   useEffect(() => {
@@ -284,7 +314,7 @@ export default function PTW_SingleForm_BilingualLabels({
           team_members: (ctx.team_members ?? []) as TeamMember[],
         });
 
-        setForm((p) => ({ ...p, sub_division_id: sdId }));
+        setValue("sub_division_id", sdId);
 
         if (id) {
           const { data } = await api.get(`/api/v1/ptw/${id}/preview`);
@@ -295,36 +325,41 @@ export default function PTW_SingleForm_BilingualLabels({
             transformerName: p?.transformer_name ?? undefined,
           });
 
-          setForm((prev) => ({
-            ...prev,
-            type: (p?.type as PtwType) || "MISC",
-            misc_type: p?.misc_type || "",
-            reference_no: p?.reference_no || "",
-            circuit_type: (p?.circuit_type as "SINGLE" | "MULTI") || prev.circuit_type,
-            is_ptw_required: (p?.is_ptw_required as "YES" | "NO") || prev.is_ptw_required,
+          // Set all form values from preview
+          setValue("type", p?.type || "MISC");
+          setValue("misc_type", p?.misc_type || "");
+          setValue("reference_no", p?.reference_no || "");
+          setValue("circuit_type", p?.circuit_type || "SINGLE");
+          setValue("is_ptw_required", p?.is_ptw_required || "YES");
+          setValue("feeder_incharge_name", p?.feeder_incharge_name || "");
+          setValue("place_of_work", p?.place_of_work || "");
+          setValue("scope_of_work", p?.scope_of_work || "");
+          setValue("safety_arrangements", p?.safety_arrangements || "");
+          setValue(
+            "scheduled_start_at",
+            p?.scheduled_start_at ? String(p.scheduled_start_at).replace(" ", "T") : "",
+          );
+          setValue(
+            "estimated_duration_min",
+            p?.estimated_duration_min != null ? String(p.estimated_duration_min) : "",
+          );
+          setValue("switch_off_time", p?.switch_off_time || "");
+          setValue("restore_time", p?.restore_time || "");
+          setValue("location_text", p?.location || "");
+          setValue("location_lat", p?.location_lat || "");
+          setValue("location_lng", p?.location_lng || "");
+          setValue("planned_from_date", p?.planned_from_date || "");
+          setValue("planned_to_date", p?.planned_to_date || "");
+          setValue(
+            "planned_schedule",
+            Array.isArray(p?.planned_schedule) ? (p.planned_schedule as PlannedScheduleRow[]) : [],
+          );
+          setValue(
+            "team_member_ids",
+            Array.isArray(p?.team_members) ? p.team_members.map((m: { id: number }) => m.id) : [],
+          );
 
-            feeder_incharge_name: p?.feeder_incharge_name || "",
-            close_feeder: p?.close_feeder || "",
-            alternate_feeder: p?.alternate_feeder || "",
-            place_of_work: p?.place_of_work || "",
-            scope_of_work: p?.scope_of_work || "",
-            safety_arrangements: p?.safety_arrangements || "",
-            scheduled_start_at: p?.scheduled_start_at ? String(p.scheduled_start_at).replace(" ", "T") : "",
-            estimated_duration_min: p?.estimated_duration_min != null ? String(p.estimated_duration_min) : "",
-            switch_off_time: p?.switch_off_time || "",
-            restore_time: p?.restore_time || "",
-            location_text: p?.location || "",
-            location_lat: p?.location_lat || "",
-            location_lng: p?.location_lng || "",
-
-            planned_from_date: p?.planned_from_date || "",
-            planned_to_date: p?.planned_to_date || "",
-            planned_schedule: Array.isArray(p?.planned_schedule) ? (p.planned_schedule as PlannedScheduleRow[]) : [],
-
-            team_member_ids: Array.isArray(p?.team_members) ? p.team_members.map((m: { id: number }) => m.id) : [],
-            existing_evidences: Array.isArray(p?.evidences) ? p.evidences : [],
-          }));
-
+          // Evidences are handled separately (state below)
           if (p?.type === "PLANNED" && !Array.isArray(p?.planned_schedule)) {
             setPlannedOpen(true);
           }
@@ -336,61 +371,55 @@ export default function PTW_SingleForm_BilingualLabels({
       }
     };
     init();
-  }, [id]);
+  }, [id, setValue]);
 
   // ---------- Circuit rules ----------
   useEffect(() => {
-    if (form.circuit_type === "SINGLE") {
-      if (form.secondary_feeder_ids.length) {
-        setForm((p) => ({ ...p, secondary_feeder_ids: [] }));
-      }
+    if (watchCircuitType === "SINGLE") {
+      setValue("secondary_feeder_ids", []);
     }
-  }, [form.circuit_type]);
+  }, [watchCircuitType, setValue]);
 
   useEffect(() => {
-    const isMiscNoPtw = form.type === "MISC" && form.is_ptw_required === "NO";
+    const isMiscNoPtw = watchType === "MISC" && watchIsPtwRequired === "NO";
     if (isMiscNoPtw) {
-      setForm((p) => ({
-        ...p,
-        circuit_type: "SINGLE",
-        secondary_feeder_ids: [],
-      }));
+      setValue("circuit_type", "SINGLE");
+      setValue("secondary_feeder_ids", []);
     }
-  }, [form.type, form.is_ptw_required]);
+  }, [watchType, watchIsPtwRequired, setValue]);
 
   // Auto-select first primary feeder on SINGLE
   useEffect(() => {
-    if (form.circuit_type !== "SINGLE") return;
-    if (form.feeder_id) return;
+    if (watchCircuitType !== "SINGLE") return;
+    if (watchFeederId) return;
     if (!context.primary_feeders.length) return;
 
-    setForm((p) => ({
-      ...p,
-      feeder_id: String(context.primary_feeders[0].id),
-    }));
-  }, [form.circuit_type, context.primary_feeders]);
+    setValue("feeder_id", String(context.primary_feeders[0].id));
+  }, [watchCircuitType, context.primary_feeders, watchFeederId, setValue]);
 
   // Resolve preview feeder name -> feeder_id
   useEffect(() => {
     if (!previewNames.feederName || !context.primary_feeders?.length) return;
-    if (form.feeder_id) return;
+    if (watchFeederId) return;
 
     const match = context.primary_feeders.find(
-      (f) => f.name === previewNames.feederName
+      (f) => f.name === previewNames.feederName,
     );
-    if (match) setForm((p) => ({ ...p, feeder_id: String(match.id) }));
-  }, [previewNames.feederName, context.primary_feeders]);
+    if (match) setValue("feeder_id", String(match.id));
+  }, [previewNames.feederName, context.primary_feeders, watchFeederId, setValue]);
 
   // Fetch transformers when feeder changes
   useEffect(() => {
     const fetchTransformers = async () => {
-      if (!form.feeder_id) {
+      if (!watchFeederId) {
         setTransformers([]);
-        setForm((p) => ({ ...p, transformer_id: "" }));
+        setValue("transformer_id", "");
         return;
       }
       try {
-        const res = await api.get(`/api/v1/meta/related?feeder_id=${form.feeder_id}`);
+        const res = await api.get(
+          `/api/v1/meta/related?feeder_id=${watchFeederId}`,
+        );
         const list: Transformer[] = res.data.lists?.transformers || [];
         setTransformers(list);
       } catch {
@@ -399,75 +428,98 @@ export default function PTW_SingleForm_BilingualLabels({
       }
     };
     fetchTransformers();
-  }, [form.feeder_id]);
+  }, [watchFeederId, setValue]);
 
   // Resolve preview transformer name -> transformer_id
   useEffect(() => {
     if (!previewNames.transformerName || !transformers.length) return;
-    if (form.transformer_id) return;
+    const currentTransId = watch("transformer_id");
+    if (currentTransId) return;
 
     const match = transformers.find(
-      (t) => t.transformer_id === previewNames.transformerName
+      (t) => t.transformer_id === previewNames.transformerName,
     );
-    if (match) setForm((p) => ({ ...p, transformer_id: String(match.id) }));
-  }, [previewNames.transformerName, transformers]);
+    if (match) setValue("transformer_id", String(match.id));
+  }, [previewNames.transformerName, transformers, watch, setValue]);
 
-  // Evidence handler
+  // ---------- Evidence state (kept separate because files) ----------
+  const [evidences, setEvidences] = useState<(File | null)[]>([null, null, null, null, null]);
+  const [existingEvidences, setExistingEvidences] = useState<
+    { id: number; file_path: string; type: string }[]
+  >([]);
+
   const handleFileChange = (i: number, file: File | null) => {
-    setForm((p) => {
-      const evidences = [...p.evidences];
-      evidences[i] = file;
-      return { ...p, evidences };
+    if (file && file.size > 2 * 1024 * 1024) {
+      toast.error(`File "${file.name}" exceeds 2MB limit.`);
+      return;
+    }
+    setEvidences((prev) => {
+      const newEv = [...prev];
+      newEv[i] = file;
+      return newEv;
     });
   };
 
-  // Type handler (PLANNED => open modal)
+  // Load existing evidences from preview
+  useEffect(() => {
+    if (id) {
+      const loadExisting = async () => {
+        try {
+          const { data } = await api.get(`/api/v1/ptw/${id}/preview`);
+          const p = data?.data?.ptw;
+          if (Array.isArray(p?.evidences)) {
+            setExistingEvidences(p.evidences);
+          }
+        } catch (error) {
+          console.error("Failed to load existing evidences", error);
+        }
+      };
+      loadExisting();
+    }
+  }, [id]);
+
+  // ---------- Type handler (PLANNED => open modal) ----------
   const handleTypeChange = (val: string) => {
     const nextType = val as PtwType;
-
+    setValue("type", nextType);
     if (nextType === "PLANNED") {
-      setForm((p) => ({ ...p, type: "PLANNED" }));
       setPlannedOpen(true);
-      return;
+    } else {
+      setValue("planned_from_date", "");
+      setValue("planned_to_date", "");
+      setValue("planned_schedule", []);
     }
-
-    // switching away from planned: clear planned payload
-    setForm((p) => ({
-      ...p,
-      type: nextType,
-      planned_from_date: "",
-      planned_to_date: "",
-      planned_schedule: [],
-    }));
   };
 
-  // ---------- Submit ----------
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // ---------- Submit handler ----------
+  const onSubmit = async (data: FormData) => {
     // planned validation
-    if (form.type === "PLANNED") {
-      if (!form.planned_from_date || !form.planned_to_date || !form.planned_schedule?.length) {
+    if (data.type === "PLANNED") {
+      if (
+        !data.planned_from_date ||
+        !data.planned_to_date ||
+        !data.planned_schedule?.length
+      ) {
         toast.error("Please complete the planned schedule.");
         setPlannedOpen(true);
         return;
       }
     }
-
-    // misc validation
-    if (form.type === "MISC") {
-      if (!form.misc_type) {
+    if (data.type === "MISC") {
+      if (!data.misc_type) {
         toast.error("Please select Misc Type.");
         return;
       }
-      if (!form.reference_no?.trim()) {
+      if (!data.reference_no?.trim()) {
         toast.error("Please enter Reference Number.");
         return;
       }
     }
 
-    const fd = new FormData();
+    // Log the entire form state for debugging
+    console.log("📋 Form State on Submit:", { ...data, evidences, existingEvidences });
 
+    const fd = new FormData();
     (
       [
         "current_date",
@@ -480,8 +532,6 @@ export default function PTW_SingleForm_BilingualLabels({
         "transformer_id",
         "feeder_incharge_name",
         "is_ptw_required",
-        "close_feeder",
-        "alternate_feeder",
         "location_text",
         "location_lat",
         "location_lng",
@@ -493,42 +543,62 @@ export default function PTW_SingleForm_BilingualLabels({
         "switch_off_time",
         "restore_time",
       ] as const
-    ).forEach((k) => fd.append(k, String((form as any)[k] ?? "")));
+    ).forEach((k) => fd.append(k, String((data as any)[k] ?? "")));
 
-    fd.set("switch_off_time", formatTime(form.switch_off_time));
-    fd.set("restore_time", formatTime(form.restore_time));
+    fd.set("switch_off_time", formatTime(data.switch_off_time));
+    fd.set("restore_time", formatTime(data.restore_time));
 
     // planned payload
-    if (form.type === "PLANNED") {
-      fd.append("planned_from_date", String(form.planned_from_date || ""));
-      fd.append("planned_to_date", String(form.planned_to_date || ""));
+    if (data.type === "PLANNED") {
+      fd.append("planned_from_date", String(data.planned_from_date || ""));
+      fd.append("planned_to_date", String(data.planned_to_date || ""));
 
-      (form.planned_schedule || []).forEach((row, idx) => {
+      (data.planned_schedule || []).forEach((row, idx) => {
         fd.append(`planned_schedule[${idx}][date]`, row.date);
-        fd.append(`planned_schedule[${idx}][start_time]`, formatTime(row.start_time));
-        fd.append(`planned_schedule[${idx}][end_time]`, formatTime(row.end_time));
+        fd.append(
+          `planned_schedule[${idx}][start_time]`,
+          formatTime(row.start_time),
+        );
+        fd.append(
+          `planned_schedule[${idx}][end_time]`,
+          formatTime(row.end_time),
+        );
       });
     }
 
     // team members
-    (form.team_member_ids as number[]).forEach((tmId) =>
-      fd.append("team_member_ids[]", String(tmId))
+    (data.team_member_ids as number[]).forEach((tmId) =>
+      fd.append("team_member_ids[]", String(tmId)),
     );
 
     // secondary feeders (only for MULTI)
-    if (form.circuit_type === "MULTI") {
-      (form.secondary_feeder_ids as number[]).forEach((fid) =>
-        fd.append("secondary_feeder_ids[]", String(fid))
+    if (data.circuit_type === "MULTI") {
+      (data.secondary_feeder_ids as number[]).forEach((fid) =>
+        fd.append("secondary_feeder_ids[]", String(fid)),
       );
     }
 
     // evidences
-    form.evidences.forEach((f, i) => {
+    evidences.forEach((f, i) => {
       if (f) {
         fd.append(`evidences[${i}][type]`, "SITE_BEFORE_SHUTDOWN");
         fd.append(`evidences[${i}][file]`, f);
       }
     });
+
+    // Log FormData entries (converting to object for readability)
+    const formDataObj: any = {};
+    fd.forEach((value, key) => {
+      if (formDataObj[key]) {
+        if (!Array.isArray(formDataObj[key])) {
+          formDataObj[key] = [formDataObj[key]];
+        }
+        formDataObj[key].push(value);
+      } else {
+        formDataObj[key] = value;
+      }
+    });
+    console.log("📎 FormData to be sent:", formDataObj);
 
     try {
       if (id) {
@@ -545,10 +615,17 @@ export default function PTW_SingleForm_BilingualLabels({
         toast.success("PTW created successfully");
       }
       next();
-    } catch {
+    } catch (error) {
+      console.error("Submit error:", error);
       toast.error("Failed to save PTW data");
       next();
     }
+  };
+
+  const formatTime = (t: string) => {
+    if (!t) return "";
+    const [h, m] = t.split(":");
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
 
   // Items for search selects
@@ -558,15 +635,18 @@ export default function PTW_SingleForm_BilingualLabels({
     subLabel: `(${f.code})`,
   }));
 
-  const secondaryItems: SearchSelectItem[] = context.secondary_feeders.map((f) => ({
-    id: f.id,
-    label: f.name,
-    subLabel: `(${f.code})`,
-  }));
- const teamItems: SearchSelectItem[] = context.team_members.map((m) => ({
+  const secondaryItems: SearchSelectItem[] = context.secondary_feeders.map(
+    (f) => ({
+      id: f.id,
+      label: f.name,
+      subLabel: `(${f.code})`,
+    }),
+  );
+  const teamItems: SearchSelectItem[] = context.team_members.map((m) => ({
     id: m.id,
     label: m.name,
   }));
+
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center text-gray-600">
@@ -574,7 +654,8 @@ export default function PTW_SingleForm_BilingualLabels({
       </div>
     );
 
-  const hideSecondaryForMiscNoPtw = form.type === "MISC" && form.is_ptw_required === "NO";
+  const hideSecondaryForMiscNoPtw =
+    watchType === "MISC" && watchIsPtwRequired === "NO";
 
   // ---------- UI ----------
   return (
@@ -582,7 +663,8 @@ export default function PTW_SingleForm_BilingualLabels({
       <div className="sticky top-0 border-b bg-white/80 backdrop-blur-sm z-10">
         <div className="mx-auto max-w-6xl px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-semibold text-slate-800">
-            PTW — Basic Information / <span className="font-urdu">بنیادی معلومات</span>
+            PTW — Basic Information /{" "}
+            <span className="font-urdu">بنیادی معلومات</span>
           </h1>
           <p className="text-xs text-slate-500">
             {id ? `Editing Permit #${id}` : "Create New Permit"}
@@ -590,23 +672,31 @@ export default function PTW_SingleForm_BilingualLabels({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="mx-auto max-w-6xl px-6 pt-6 pb-24 space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="mx-auto max-w-6xl px-6 pt-6 pb-24 space-y-6"
+      >
         <PlannedScheduleModal
           open={plannedOpen}
           onClose={() => {
             setPlannedOpen(false);
-            setForm((p) => {
-              if (p.type === "PLANNED" && (!p.planned_from_date || !p.planned_to_date || !p.planned_schedule?.length)) {
-                return { ...p, type: "MISC" };
-              }
-              return p;
-            });
+            // If planned schedule is incomplete, revert to MISC
+            if (
+              watchType === "PLANNED" &&
+              (!watch("planned_from_date") ||
+                !watch("planned_to_date") ||
+                !watchPlannedSchedule?.length)
+            ) {
+              setValue("type", "MISC");
+            }
           }}
-          initialFrom={form.planned_from_date || undefined}
-          initialTo={form.planned_to_date || undefined}
-          initialSchedule={form.planned_schedule || undefined}
+          initialFrom={watch("planned_from_date") || undefined}
+          initialTo={watch("planned_to_date") || undefined}
+          initialSchedule={watchPlannedSchedule || undefined}
           onSave={({ planned_from_date, planned_to_date, planned_schedule }) => {
-            setForm((p) => ({ ...p, planned_from_date, planned_to_date, planned_schedule }));
+            setValue("planned_from_date", planned_from_date);
+            setValue("planned_to_date", planned_to_date);
+            setValue("planned_schedule", planned_schedule);
           }}
         />
 
@@ -616,43 +706,69 @@ export default function PTW_SingleForm_BilingualLabels({
               <FormLabel>
                 Current Date / <span className="font-urdu">تاریخ</span>
               </FormLabel>
-              <FormInput value={form.current_date} readOnly className="bg-gray-100" />
+              <FormInput
+                value={watch("current_date")}
+                readOnly
+                className="bg-gray-100"
+              />
             </div>
             <div>
               <FormLabel>
                 Sub Division / <span className="font-urdu">سب ڈویژن</span>
               </FormLabel>
-              <FormInput value={context.sub_division?.name || ""} readOnly className="bg-gray-100" />
+              <FormInput
+                value={context.sub_division?.name || ""}
+                readOnly
+                className="bg-gray-100"
+              />
             </div>
             <div>
               <FormLabel>
                 Type / <span className="font-urdu">قسم</span>
               </FormLabel>
-              <FormSelect required value={form.type} onChange={(e) => handleTypeChange(e.target.value)}>
-                <option value="MISC">MISC</option>
-                <option value="PLANNED">PLANNED</option>
-                <option value="EMERGENCY">EMERGENCY</option>
-              </FormSelect>
+              <Controller
+                name="type"
+                control={control}
+                render={({ field }) => (
+                  <FormSelect
+                    required
+                    value={field.value}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                  >
+                    <option value="MISC">MISC</option>
+                    <option value="PLANNED">PLANNED</option>
+                    <option value="EMERGENCY">EMERGENCY</option>
+                  </FormSelect>
+                )}
+              />
             </div>
 
             {/* Planned Summary Card */}
-            {form.type === "PLANNED" ? (
+            {watchType === "PLANNED" ? (
               <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-700">Planned Window</div>
+                    <div className="text-sm font-semibold text-slate-700">
+                      Planned Window
+                    </div>
                     <div className="text-xs text-slate-600 mt-1">
-                      {form.planned_from_date && form.planned_to_date
-                        ? `${form.planned_from_date} → ${form.planned_to_date}`
+                      {watch("planned_from_date") && watch("planned_to_date")
+                        ? `${watch("planned_from_date")} → ${watch("planned_to_date")}`
                         : "Not set"}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">Days: {form.planned_schedule?.length || 0}</div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Days: {watchPlannedSchedule?.length || 0}
+                    </div>
                   </div>
-                  <Button type="button" variant="outline-secondary" onClick={() => setPlannedOpen(true)}>
+                  <Button
+                    type="button"
+                    variant="outline-secondary"
+                    onClick={() => setPlannedOpen(true)}
+                  >
                     Edit Schedule
                   </Button>
                 </div>
-                {!form.planned_schedule?.length ? (
+                {!watchPlannedSchedule?.length ? (
                   <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     Schedule not set yet. Please click “Edit Schedule”.
                   </div>
@@ -660,31 +776,34 @@ export default function PTW_SingleForm_BilingualLabels({
               </div>
             ) : null}
 
-            {form.type === "MISC" && (
+            {watchType === "MISC" && (
               <div className="col-span-2">
                 <FormLabel>
-                  PTW Required? / <span className="font-urdu">پی ٹی ڈبلیو ضروری ہے؟</span>
+                  PTW Required? /{" "}
+                  <span className="font-urdu">پی ٹی ڈبلیو ضروری ہے؟</span>
                 </FormLabel>
                 <div className="flex gap-6 mt-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="is_ptw_required"
                       value="YES"
-                      checked={form.is_ptw_required === "YES"}
-                      onChange={() => setForm((p) => ({ ...p, is_ptw_required: "YES" }))}
+                      checked={watchIsPtwRequired === "YES"}
+                      onChange={() => setValue("is_ptw_required", "YES")}
                     />
-                    <span>Yes / <span className="font-urdu">ہاں</span></span>
+                    <span>
+                      Yes / <span className="font-urdu">ہاں</span>
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
-                      name="is_ptw_required"
                       value="NO"
-                      checked={form.is_ptw_required === "NO"}
-                      onChange={() => setForm((p) => ({ ...p, is_ptw_required: "NO" }))}
+                      checked={watchIsPtwRequired === "NO"}
+                      onChange={() => setValue("is_ptw_required", "NO")}
                     />
-                    <span>No / <span className="font-urdu">نہیں</span></span>
+                    <span>
+                      No / <span className="font-urdu">نہیں</span>
+                    </span>
                   </label>
                 </div>
               </div>
@@ -699,61 +818,78 @@ export default function PTW_SingleForm_BilingualLabels({
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="circuit_type"
                     value="SINGLE"
-                    checked={form.circuit_type === "SINGLE"}
-                    onChange={() => setForm((p) => ({ ...p, circuit_type: "SINGLE" }))}
+                    checked={watchCircuitType === "SINGLE"}
+                    onChange={() => setValue("circuit_type", "SINGLE")}
                     disabled={hideSecondaryForMiscNoPtw}
                   />
-                  <span>Single Circuit / <span className="font-urdu">سنگل سرکٹ</span></span>
+                  <span>
+                    Single Circuit /{" "}
+                    <span className="font-urdu">سنگل سرکٹ</span>
+                  </span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
-                    name="circuit_type"
                     value="MULTI"
-                    checked={form.circuit_type === "MULTI"}
-                    onChange={() => setForm((p) => ({ ...p, circuit_type: "MULTI" }))}
+                    checked={watchCircuitType === "MULTI"}
+                    onChange={() => setValue("circuit_type", "MULTI")}
                     disabled={hideSecondaryForMiscNoPtw}
                   />
-                  <span>Multi Circuit / <span className="font-urdu">ملٹی سرکٹ</span></span>
+                  <span>
+                    Multi Circuit / <span className="font-urdu">ملٹی سرکٹ</span>
+                  </span>
                 </label>
               </div>
               {hideSecondaryForMiscNoPtw ? (
                 <div className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  Secondary feeders disabled because PTW Required is <b>NO</b> in MISC.
+                  Secondary feeders disabled because PTW Required is <b>NO</b>{" "}
+                  in MISC.
                 </div>
               ) : null}
             </div>
 
-            {form.type === "MISC" && (
+            {watchType === "MISC" && (
               <>
                 <div>
                   <FormLabel>
                     Misc Type / <span className="font-urdu">متفرق نوعیت</span>
                   </FormLabel>
-                  <FormSelect
-                    required
-                    value={form.misc_type}
-                    onChange={(e) => setForm({ ...form, misc_type: e.target.value })}
-                  >
-                    <option value="">Select Misc Type</option>
-                    <option value="MCO">MCO</option>
-                    <option value="SCO">SCO</option>
-                    <option value="RCO">RCO</option>
-                    <option value="DCO">DCO</option>
-                    <option value="COMPLAINT">COMPLAINT</option>
-                  </FormSelect>
+                  <Controller
+                    name="misc_type"
+                    control={control}
+                    render={({ field }) => (
+                      <FormSelect
+                        required
+                        value={field.value}
+                        onChange={field.onChange}
+                      >
+                        <option value="">Select Misc Type</option>
+                        <option value="MCO">MCO</option>
+                        <option value="SCO">SCO</option>
+                        <option value="RCO">RCO</option>
+                        <option value="DCO">DCO</option>
+                        <option value="COMPLAINT">COMPLAINT</option>
+                      </FormSelect>
+                    )}
+                  />
                 </div>
                 <div>
                   <FormLabel>
-                    {form.misc_type} No / <span className="font-urdu">ریفرنس نمبر</span>
+                    {watch("misc_type")} No /{" "}
+                    <span className="font-urdu">ریفرنس نمبر</span>
                   </FormLabel>
-                  <FormInput
-                    required
-                    value={form.reference_no}
-                    onChange={(e) => setForm({ ...form, reference_no: e.target.value })}
-                    placeholder="Enter reference number"
+                  <Controller
+                    name="reference_no"
+                    control={control}
+                    render={({ field }) => (
+                      <FormInput
+                        required
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Enter reference number"
+                      />
+                    )}
                   />
                 </div>
               </>
@@ -765,50 +901,73 @@ export default function PTW_SingleForm_BilingualLabels({
             <FormLabel>
               Primary Feeder / <span className="font-urdu">بنیادی فیڈر</span>
             </FormLabel>
-            <SearchSelect
-              items={feederItems}
-              value={form.feeder_id ? Number(form.feeder_id) : null}
-              onChange={(val) => setForm((p) => ({ ...p, feeder_id: val ? String(val) : "" }))}
-              required
+            <Controller
+              name="feeder_id"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  items={feederItems}
+                  value={field.value ? Number(field.value) : null}
+                  onChange={(val) => field.onChange(val ? String(val) : "")}
+                  required
+                  // error={errors.feeder_id?.message}
+                />
+              )}
             />
           </div>
 
           {/* Secondary Feeders - MULTI only */}
-          {form.circuit_type === "MULTI" && !hideSecondaryForMiscNoPtw && (
+          {watchCircuitType === "MULTI" && !hideSecondaryForMiscNoPtw && (
             <div>
               <FormLabel>
-                Secondary Feeders / <span className="font-urdu">سیکنڈری فیڈرز</span>
+                Secondary Feeders /{" "}
+                <span className="font-urdu">سیکنڈری فیڈرز</span>
               </FormLabel>
-              <SearchSelect
-                multi
-                items={secondaryItems}
-                values={form.secondary_feeder_ids}
-                onChangeMulti={(vals) => setForm((p) => ({ ...p, secondary_feeder_ids: vals as number[] }))}
+              <Controller
+                name="secondary_feeder_ids"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    multi
+                    items={secondaryItems}
+                    values={field.value}
+                    onChangeMulti={(vals) => field.onChange(vals)}
+                  />
+                )}
               />
             </div>
           )}
 
           {/* Transformer */}
-         <div>
-  <FormLabel>
-    Transformer / <span className="font-urdu">ٹرانسفارمر</span>
-  </FormLabel>
-  <SearchSelect
-    items={transformers.map(t => ({
-      id: t.id,
-      label: `${t.transformer_id} — ${t.transformer_ref_no}`,
-    }))}
-    value={form.transformer_id ? Number(form.transformer_id) : null}
-    onChange={(val) => setForm((p) => ({ ...p, transformer_id: val ? String(val) : "" }))}
-    disabled={!form.feeder_id}
-    required
-    placeholder={form.feeder_id 
-      ? transformers.length 
-        ? "Select Transformer" 
-        : "No transformers found"
-      : "Select Feeder first"}
-  />
-</div>
+          <div>
+            <FormLabel>
+              Transformer / <span className="font-urdu">ٹرانسفارمر</span>
+            </FormLabel>
+            <Controller
+              name="transformer_id"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  items={transformers.map((t) => ({
+                    id: t.id,
+                    label: `${t.transformer_id} — ${t.transformer_ref_no}`,
+                  }))}
+                  value={field.value ? Number(field.value) : null}
+                  onChange={(val) => field.onChange(val ? String(val) : "")}
+                  disabled={!watchFeederId}
+                  required
+                  placeholder={
+                    watchFeederId
+                      ? transformers.length
+                        ? "Select Transformer"
+                        : "No transformers found"
+                      : "Select Feeder first"
+                  }
+                  // error={errors.transformer_id?.message}
+                />
+              )}
+            />
+          </div>
 
           {/* Times and Duration */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -816,34 +975,58 @@ export default function PTW_SingleForm_BilingualLabels({
               <FormLabel>
                 Switch Off Time / <span className="font-urdu">بجلی بند</span>
               </FormLabel>
-              <FormInput
-                required
-                type="time"
-                value={form.switch_off_time}
-                onChange={(e) => setForm({ ...form, switch_off_time: e.target.value })}
+              <Controller
+                name="switch_off_time"
+                control={control}
+                render={({ field }) => (
+                  <FormInput
+                    required
+                    type="time"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </div>
             <div>
               <FormLabel>
                 Restore Time / <span className="font-urdu">بحالی</span>
               </FormLabel>
-              <FormInput
-                required
-                type="time"
-                value={form.restore_time}
-                onChange={(e) => setForm({ ...form, restore_time: e.target.value })}
+              <Controller
+                name="restore_time"
+                control={control}
+                render={({ field }) => (
+                  <FormInput
+                    required
+                    type="time"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             </div>
             <div>
               <FormLabel>
                 Duration (Minutes) / <span className="font-urdu">دورانیہ</span>
               </FormLabel>
-              <FormInput
-                required
-                type="number"
-                value={form.estimated_duration_min}
-                onChange={(e) => setForm({ ...form, estimated_duration_min: e.target.value })}
+              <Controller
+                name="estimated_duration_min"
+                control={control}
+                render={({ field }) => (
+                  <FormInput
+                    required
+                    type="number"
+                    min="15"
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
               />
+              {errors.estimated_duration_min && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.estimated_duration_min.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -852,11 +1035,22 @@ export default function PTW_SingleForm_BilingualLabels({
             <FormLabel>
               Feeder Incharge / <span className="font-urdu">فیڈر انچارج</span>
             </FormLabel>
-            <FormInput
-              required
-              value={form.feeder_incharge_name}
-              onChange={(e) => setForm({ ...form, feeder_incharge_name: e.target.value })}
+            <Controller
+              name="feeder_incharge_name"
+              control={control}
+              render={({ field }) => (
+                <FormInput
+                  required
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
+            {errors.feeder_incharge_name && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.feeder_incharge_name.message}
+              </p>
+            )}
           </div>
 
           {/* Place of Work */}
@@ -864,12 +1058,23 @@ export default function PTW_SingleForm_BilingualLabels({
             <FormLabel>
               Place of Work / <span className="font-urdu">کام کی جگہ</span>
             </FormLabel>
-            <FormInput
-              required
-              value={form.place_of_work}
-              onChange={(e) => setForm({ ...form, place_of_work: e.target.value })}
-              placeholder="Enter place of work"
+            <Controller
+              name="place_of_work"
+              control={control}
+              render={({ field }) => (
+                <FormInput
+                  required
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Enter place of work"
+                />
+              )}
             />
+            {errors.place_of_work && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.place_of_work.message}
+              </p>
+            )}
           </div>
 
           {/* ---------- Location Section with Inline Map ---------- */}
@@ -878,21 +1083,6 @@ export default function PTW_SingleForm_BilingualLabels({
               Location / <span className="font-urdu">مقام</span>
             </FormLabel>
 
-            {/* Search box (optional) */}
-            {/* {isLoaded && (
-              <div className="mb-2">
-                <input
-                  id="map-search-input"
-                  type="text"
-                  placeholder="Search for a place..."
-                  className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm focus:border-primary focus:outline-none"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                />
-              </div>
-            )} */}
-
-            {/* Map */}
             {loadError ? (
               <div className="rounded-lg bg-red-50 p-4 text-red-600">
                 Error loading Google Maps. Please check your API key.
@@ -908,27 +1098,31 @@ export default function PTW_SingleForm_BilingualLabels({
                 zoom={15}
                 onLoad={onMapLoad}
               >
-                <Marker position={markerPosition} draggable onDragEnd={onMarkerDragEnd} />
+                <Marker
+                  position={markerPosition}
+                  draggable
+                  onDragEnd={onMarkerDragEnd}
+                />
               </GoogleMap>
             )}
 
             {/* Address and coordinates (read-only) */}
             <div className="mt-3 grid grid-cols-1 gap-2">
               <FormInput
-                value={form.location_text}
+                value={watch("location_text")}
                 readOnly
                 className="bg-gray-100"
                 placeholder="Address will appear here"
               />
               <div className="grid grid-cols-2 gap-2">
                 <FormInput
-                  value={form.location_lat}
+                  value={watch("location_lat")}
                   readOnly
                   className="bg-gray-100"
                   placeholder="Latitude"
                 />
                 <FormInput
-                  value={form.location_lng}
+                  value={watch("location_lng")}
                   readOnly
                   className="bg-gray-100"
                   placeholder="Longitude"
@@ -956,26 +1150,20 @@ export default function PTW_SingleForm_BilingualLabels({
                           if (status === "OK" && results?.[0]) {
                             const address = results[0].formatted_address;
                             setAddress(address);
-                            setForm((prev) => ({
-                              ...prev,
-                              location_lat: latitude.toFixed(6),
-                              location_lng: longitude.toFixed(6),
-                              location_text: address,
-                            }));
+                            setValue("location_lat", latitude.toFixed(6));
+                            setValue("location_lng", longitude.toFixed(6));
+                            setValue("location_text", address);
                           } else {
                             const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
                             setAddress(fallback);
-                            setForm((prev) => ({
-                              ...prev,
-                              location_lat: latitude.toFixed(6),
-                              location_lng: longitude.toFixed(6),
-                              location_text: fallback,
-                            }));
+                            setValue("location_lat", latitude.toFixed(6));
+                            setValue("location_lng", longitude.toFixed(6));
+                            setValue("location_text", fallback);
                           }
-                        }
+                        },
                       );
                     },
-                    () => toast.error("Unable to get your location")
+                    () => toast.error("Unable to get your location"),
                   );
                 }
               }}
@@ -986,53 +1174,85 @@ export default function PTW_SingleForm_BilingualLabels({
           {/* ---------- End Location Section ---------- */}
 
           {/* Team Members */}
-        <div>
-  <FormLabel>
-    Team Members / <span className="font-urdu">ٹیم ممبرز</span>
-  </FormLabel>
-  <SearchSelect
-    multi
-    items={teamItems}
-    values={form.team_member_ids}
-    onChangeMulti={(vals) => setForm(prev => ({ ...prev, team_member_ids: vals as number[] }))}
-    placeholder="Select team members..."
-  />
-</div>
+          <div>
+            <FormLabel>
+              Team Members / <span className="font-urdu">ٹیم ممبرز</span>
+            </FormLabel>
+            <Controller
+              name="team_member_ids"
+              control={control}
+              render={({ field }) => (
+                <SearchSelect
+                  multi
+                  items={teamItems}
+                  values={field.value}
+                  onChangeMulti={(vals) => field.onChange(vals)}
+                  placeholder="Select team members..."
+                />
+              )}
+            />
+          </div>
+
           {/* Scope of Work */}
           <div>
             <FormLabel>
-              Description / Scope of Work <span className="font-urdu">کام کی تفصیل</span>
+              Description / Scope of Work{" "}
+              <span className="font-urdu">کام کی تفصیل</span>
             </FormLabel>
-            <FormTextarea
-              required
-              rows={3}
-              value={form.scope_of_work}
-              onChange={(e) => setForm({ ...form, scope_of_work: e.target.value })}
+            <Controller
+              name="scope_of_work"
+              control={control}
+              render={({ field }) => (
+                <FormTextarea
+                  required
+                  rows={3}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
+            {errors.scope_of_work && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.scope_of_work.message}
+              </p>
+            )}
           </div>
 
           {/* Safety Arrangements */}
           <div>
             <FormLabel>
-              Safety Arrangements / <span className="font-urdu">حفاظتی انتظامات</span>
+              Safety Arrangements /{" "}
+              <span className="font-urdu">حفاظتی انتظامات</span>
             </FormLabel>
-            <FormTextarea
-              required
-              rows={3}
-              value={form.safety_arrangements}
-              onChange={(e) => setForm({ ...form, safety_arrangements: e.target.value })}
+            <Controller
+              name="safety_arrangements"
+              control={control}
+              render={({ field }) => (
+                <FormTextarea
+                  required
+                  rows={3}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
+            {errors.safety_arrangements && (
+              <p className="text-xs text-red-500 mt-1">
+                {errors.safety_arrangements.message}
+              </p>
+            )}
           </div>
 
-          {/* Evidence Photos */}
+          {/* Evidence Photos - now with 5 slots */}
           <div>
             <FormLabel>
-              Evidence Photos (max 3) / <span className="font-urdu">شواہد</span>
+              Evidence Photos (max 5, 2MB each) /{" "}
+              <span className="font-urdu">شواہد</span>
             </FormLabel>
             <div className="flex flex-wrap gap-4">
-              {Array.from({ length: 3 }).map((_, i) => {
-                const existing = form.existing_evidences?.[i];
-                const file = form.evidences[i];
+              {Array.from({ length: 5 }).map((_, i) => {
+                const existing = existingEvidences?.[i];
+                const file = evidences[i];
 
                 const previewUrl = file
                   ? URL.createObjectURL(file)
@@ -1043,18 +1263,25 @@ export default function PTW_SingleForm_BilingualLabels({
                     : null;
 
                 return (
-                  <div key={i} className="flex flex-col items-center gap-2 border rounded-lg p-2 shadow-sm bg-slate-50">
+                  <div
+                    key={i}
+                    className="flex flex-col items-center gap-2 border rounded-lg p-2 shadow-sm bg-slate-50"
+                  >
                     {previewUrl ? (
                       <img
                         src={previewUrl}
                         alt={`Evidence ${i + 1}`}
                         className="w-28 h-28 object-cover rounded-md border cursor-pointer hover:scale-105 transition"
-                        onClick={() => document.getElementById(`evidence-${i}`)?.click()}
+                        onClick={() =>
+                          document.getElementById(`evidence-${i}`)?.click()
+                        }
                       />
                     ) : (
                       <div
                         className="w-28 h-28 flex items-center justify-center border-2 border-dashed rounded-md text-slate-400 cursor-pointer hover:bg-slate-100"
-                        onClick={() => document.getElementById(`evidence-${i}`)?.click()}
+                        onClick={() =>
+                          document.getElementById(`evidence-${i}`)?.click()
+                        }
                       >
                         Upload
                       </div>
@@ -1065,10 +1292,18 @@ export default function PTW_SingleForm_BilingualLabels({
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                      onChange={(e) =>
+                        handleFileChange(i, e.target.files?.[0] || null)
+                      }
                     />
                     <p className="text-[11px] text-slate-600">
-                      {existing ? existing.type.replaceAll("_", " ") : "New Evidence"}
+                      {existing
+                        ? existing.type.replaceAll("_", " ")
+                        : file
+                          ? file.name.length > 20
+                            ? file.name.substring(0, 17) + "..."
+                            : file.name
+                          : `Slot ${i + 1}`}
                     </p>
                   </div>
                 );

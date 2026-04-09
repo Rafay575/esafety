@@ -33,8 +33,7 @@ export default function PTW_StepperWizardFinal() {
 
   const next = () => setStep((s) => Math.min(STEPS.length, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
-  const onFinish = () => alert("✅ All steps completed successfully!");
-
+ 
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -44,7 +43,7 @@ export default function PTW_StepperWizardFinal() {
       case 3:
         return <HazardIdentificationChecklist id={id} next={next} back={back} />;
     
-      case 6:
+      case 4:
         return <PTWPreview id={id} back={back}/>; // ✅ PREVIEW STEP
       default:
         return null;

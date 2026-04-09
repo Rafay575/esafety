@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "https://mepco.myflexihr.com", // your production API base URL
+  baseURL: "https://dev.mepco.myflexihr.com", // your production API base URL
   headers: {
     "Content-Type": "application/json",
   },
@@ -14,4 +14,3 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Optional: add auth token or CSRF handling if needed later

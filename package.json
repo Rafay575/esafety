@@ -56,7 +56,7 @@
     "react": "18.2.0",
     "react-datepicker": "^8.9.0",
     "react-dom": "18.2.0",
-    "react-hook-form": "^7.65.0",
+    "react-hook-form": "^7.71.1",
     "react-leaflet": "^4.2.1",
     "react-otp-input": "^3.1.1",
     "react-redux": "9.0.4",
@@ -73,6 +73,7 @@
     "tom-select": "2.3.1",
     "xlsx": "0.18.5",
     "yup": "^1.7.1",
+    "zod": "^4.3.6",
     "zoom-vanilla.js": "2.0.6"
   },
   "devDependencies": {

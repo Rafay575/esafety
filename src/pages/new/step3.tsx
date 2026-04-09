@@ -135,9 +135,9 @@ export default function HazardIdentificationChecklist({
     const formattedAnswers = Object.entries(answers).map(([hazardIdStr, ans]) => {
       const hazardId = Number(hazardIdStr);
       return {
-        hazard_id: hazardId,
+        checklist_item_id: hazardId,
         value: ans.value,
-        precaution_ids: ans.value === "YES" ? ans.precautions : [], // only send precautions if YES
+     
       };
     });
 
@@ -148,9 +148,9 @@ export default function HazardIdentificationChecklist({
       const otherHazard = hazards.find((h) => h.label_en.toLowerCase().includes("other"));
       if (otherHazard) {
         formattedAnswers.push({
-          hazard_id: otherHazard.id,
+          checklist_item_id: otherHazard.id,
           value: "YES",
-          precaution_ids: [], // no precautions for "other", but we have the text
+        
           // need to extend type
         });
       }
@@ -162,7 +162,7 @@ export default function HazardIdentificationChecklist({
       // You may need a different endpoint – step3-hazards might not accept this new structure.
       // If the backend expects the old format, you'll have to adapt.
       // I'll assume a new endpoint /step3-hazards-v2 or we keep the same but adjust backend.
-      await api.post(`/api/v1/ptw/${id}/step3-hazards`, { hazards: formattedAnswers });
+      await api.post(`/api/v1/ptw/${id}/step3-hazards`, { answers: formattedAnswers });
       toast.success("Hazard checklist saved successfully!");
       next();
     } catch (err) {
