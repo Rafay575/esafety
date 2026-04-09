@@ -31,7 +31,6 @@ export default function PostingForm() {
     watch,
     setValue,
     reset,
-    formState: { errors },
   } = useForm<PostingFormValues>({
     defaultValues: {
       user_id: "",
@@ -68,16 +67,17 @@ export default function PostingForm() {
   const subDivId = Number(watch("sub_division_id") || 0);
   const effectiveFrom = watch("effective_from");
 
+  const selectedUser = users.find((u: any) => Number(u.value) === userId);
+  const isXEN = selectedUser?.roleName?.trim().toUpperCase() === "XEN";
+
   /* --------------------------
         VALIDATION FUNCTIONS
   --------------------------- */
-  // Get today's date in YYYY-MM-DD format
   const getToday = () => {
     const today = new Date();
     return today.toISOString().split("T")[0];
   };
 
-  // Validate effective_to is greater than effective_from
   const validateEffectiveTo = (value: string) => {
     if (!value) return "Effective to is required";
 
@@ -88,7 +88,6 @@ export default function PostingForm() {
     return true;
   };
 
-  // Validate effective_from is today or in the future
   const validateEffectiveFrom = (value: string) => {
     if (!value) return "Effective from is required";
 
@@ -128,7 +127,16 @@ export default function PostingForm() {
     return true;
   };
 
- 
+  const validateSubDivision = (value: number) => {
+    if (isGridPosting) return true;
+    if (isXEN) return true;
+
+    if (!value || value === 0) {
+      return "Sub Division is required";
+    }
+
+    return true;
+  };
 
   const validateGrid = (value: number) => {
     if (isGridPosting && (!value || value === 0)) {
@@ -149,16 +157,17 @@ export default function PostingForm() {
           rows.map((u: any) => ({
             value: u.id.toString(),
             label: `${u.name} (${u.id})`,
+            roleName: u.roles?.[0]?.name ?? "",
           }))
         );
-      });
+      })
+      .catch(() => setUsers([]));
   }, []);
 
   /* --------------------------
         FETCH REGIONS AND GRID
   --------------------------- */
   useEffect(() => {
-    // Fetch regions
     api
       .get("/api/v1/meta/regions", { params: { per_page: "all" } })
       .then((res) => {
@@ -167,10 +176,10 @@ export default function PostingForm() {
       })
       .catch(() => setRegions([]));
 
-    // Fetch grid stations
     api
       .get("/api/v1/meta/grid-stations", { params: { per_page: "all" } })
-      .then((res) => setGrid(res.data.data ?? res.data.rows ?? []));
+      .then((res) => setGrid(res.data.data ?? res.data.rows ?? []))
+      .catch(() => setGrid([]));
   }, []);
 
   /* --------------------------
@@ -200,14 +209,23 @@ export default function PostingForm() {
         setValue("division_id", 0);
         setValue("sub_division_id", 0);
         setValue("feeder_id", 0);
+      })
+      .catch(() => {
+        setCircles([]);
+        setDivisions([]);
+        setSubDivisions([]);
+        setFeeders([]);
       });
-  }, [regionId]);
+  }, [regionId, setValue]);
 
   useEffect(() => {
     if (!circleId) {
       setDivisions([]);
       setSubDivisions([]);
       setFeeders([]);
+      setValue("division_id", 0);
+      setValue("sub_division_id", 0);
+      setValue("feeder_id", 0);
       return;
     }
 
@@ -220,13 +238,20 @@ export default function PostingForm() {
         setValue("division_id", 0);
         setValue("sub_division_id", 0);
         setValue("feeder_id", 0);
+      })
+      .catch(() => {
+        setDivisions([]);
+        setSubDivisions([]);
+        setFeeders([]);
       });
-  }, [circleId]);
+  }, [circleId, setValue]);
 
   useEffect(() => {
     if (!divisionId) {
       setSubDivisions([]);
       setFeeders([]);
+      setValue("sub_division_id", 0);
+      setValue("feeder_id", 0);
       return;
     }
 
@@ -237,12 +262,17 @@ export default function PostingForm() {
         setFeeders([]);
         setValue("sub_division_id", 0);
         setValue("feeder_id", 0);
+      })
+      .catch(() => {
+        setSubDivisions([]);
+        setFeeders([]);
       });
-  }, [divisionId]);
+  }, [divisionId, setValue]);
 
   useEffect(() => {
     if (!subDivId) {
       setFeeders([]);
+      setValue("feeder_id", 0);
       return;
     }
 
@@ -250,8 +280,11 @@ export default function PostingForm() {
       .get("/api/v1/meta/related", { params: { sub_division_id: subDivId } })
       .then((res) => {
         setFeeders(res.data?.lists?.feeders ?? []);
+      })
+      .catch(() => {
+        setFeeders([]);
       });
-  }, [subDivId]);
+  }, [subDivId, setValue]);
 
   /* --------------------------
         HANDLE GRID CHECKBOX CHANGE
@@ -260,9 +293,7 @@ export default function PostingForm() {
     const checked = e.target.checked;
     setIsGridPosting(checked);
 
-    // Reset dependent fields when toggling
     if (checked) {
-      // Switching to grid posting - clear division/sub-division/feeder
       setValue("division_id", 0);
       setValue("sub_division_id", 0);
       setValue("feeder_id", 0);
@@ -270,7 +301,6 @@ export default function PostingForm() {
       setSubDivisions([]);
       setFeeders([]);
     } else {
-      // Switching to non-grid posting - clear grid
       setValue("grid_id", 0);
     }
   };
@@ -280,8 +310,8 @@ export default function PostingForm() {
   --------------------------- */
   const onSubmit = async (data: PostingFormValues) => {
     try {
-      // Final validation before submission
       const today = getToday();
+
       if (data.effective_from < today) {
         toast.error("Effective from must be today or a future date");
         return;
@@ -292,39 +322,35 @@ export default function PostingForm() {
         return;
       }
 
-      // Prepare payload based on posting type
-      const payload = {
+      const payload: any = {
         user_id: parseInt(data.user_id),
         effective_from: data.effective_from,
         effective_to: data.effective_to,
         region_id: data.region_id,
         circle_id: data.circle_id,
-        posting_type: isGridPosting ? "grid" : "non-grid"
+        posting_type: isGridPosting ? "grid" : "non-grid",
       };
 
       if (isGridPosting) {
-        // Grid posting: include grid_id, exclude others
         Object.assign(payload, {
           grid_id: data.grid_id,
           division_id: null,
           sub_division_id: null,
-          feeder_id: null
+          feeder_id: null,
         });
       } else {
-        // Non-grid posting: include division and sub-division
         Object.assign(payload, {
           division_id: data.division_id,
-          sub_division_id: data.sub_division_id,
+          sub_division_id: data.sub_division_id || null,
           feeder_id: data.feeder_id || null,
-          grid_id: null
+          grid_id: null,
         });
       }
 
       await api.post("/api/v1/meta/user-postings", payload);
 
       toast.success("Posting created successfully!");
-      
-      // Reset form after successful submission
+
       reset({
         user_id: "",
         region_id: 0,
@@ -336,32 +362,32 @@ export default function PostingForm() {
         effective_from: "",
         effective_to: "",
       });
+
       setIsGridPosting(false);
       setCircles([]);
       setDivisions([]);
       setSubDivisions([]);
       setFeeders([]);
-      
     } catch (err) {
       toast.error("Failed to save posting");
     }
   };
 
   /* ------------------------------
-         BEAUTIFUL UI STARTS
+         UI
   ------------------------------- */
   return (
     <div className="m-5">
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-xl border p-8 intro-y space-y-8">
-        {/* Header */}
         <div className="border-b pb-4">
-          <h1 className="text-2xl font-bold text-slate-800">Assign User Posting</h1>
+          <h1 className="text-2xl font-bold text-slate-800">
+            Assign User Posting
+          </h1>
           <p className="text-sm text-slate-500 mt-1">
             Select user and region hierarchy to assign posting.
           </p>
         </div>
 
-        {/* Grid Checkbox */}
         <div className="mb-4">
           <FormCheck>
             <FormCheck.Input
@@ -375,15 +401,18 @@ export default function PostingForm() {
               Grid Posting
             </FormCheck.Label>
           </FormCheck>
+
           <p className="text-sm text-gray-500 mt-1">
             {isGridPosting
               ? "Only Region, Circle, and Grid fields are required"
-              : "Region, Circle, Division, and Sub Division fields are required"}
+              : isXEN
+                ? "Region, Circle, and Division fields are required. Sub Division is optional for XEN."
+                : "Region, Circle, Division, and Sub Division fields are required"}
           </p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          {/* User Field - Always Required */}
+          {/* User */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">
               User *
@@ -393,7 +422,7 @@ export default function PostingForm() {
               control={control}
               rules={{
                 required: "User is required",
-                validate: validateUser
+                validate: validateUser,
               }}
               render={({ field, fieldState: { error } }) => (
                 <div>
@@ -404,16 +433,17 @@ export default function PostingForm() {
                     className={error ? "border-red-500" : ""}
                   />
                   {error && (
-                    <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {error.message}
+                    </p>
                   )}
                 </div>
               )}
             />
           </div>
 
-          {/* 3 Column Hierarchy */}
+          {/* Region / Circle / Division or Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Region - Always Required */}
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
                 Region *
@@ -423,7 +453,7 @@ export default function PostingForm() {
                 control={control}
                 rules={{
                   required: "Region is required",
-                  validate: validateRegion
+                  validate: validateRegion,
                 }}
                 render={({ field, fieldState: { error } }) => (
                   <div>
@@ -437,14 +467,15 @@ export default function PostingForm() {
                       className={error ? "border-red-500" : ""}
                     />
                     {error && (
-                      <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {error.message}
+                      </p>
                     )}
                   </div>
                 )}
               />
             </div>
 
-            {/* Circle - Always Required */}
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
                 Circle *
@@ -454,7 +485,7 @@ export default function PostingForm() {
                 control={control}
                 rules={{
                   required: "Circle is required",
-                  validate: validateCircle
+                  validate: validateCircle,
                 }}
                 render={({ field, fieldState: { error } }) => (
                   <div>
@@ -469,14 +500,15 @@ export default function PostingForm() {
                       className={error ? "border-red-500" : ""}
                     />
                     {error && (
-                      <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {error.message}
+                      </p>
                     )}
                   </div>
                 )}
               />
             </div>
 
-            {/* Grid - Only for Grid Posting */}
             {isGridPosting ? (
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -487,7 +519,7 @@ export default function PostingForm() {
                   control={control}
                   rules={{
                     required: "Grid is required",
-                    validate: validateGrid
+                    validate: validateGrid,
                   }}
                   render={({ field, fieldState: { error } }) => (
                     <div>
@@ -501,14 +533,15 @@ export default function PostingForm() {
                         className={error ? "border-red-500" : ""}
                       />
                       {error && (
-                        <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {error.message}
+                        </p>
                       )}
                     </div>
                   )}
                 />
               </div>
             ) : (
-              /* Division - Only for Non-Grid Posting */
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
                   Division *
@@ -518,7 +551,7 @@ export default function PostingForm() {
                   control={control}
                   rules={{
                     required: "Division is required",
-                    validate: validateDivision
+                    validate: validateDivision,
                   }}
                   render={({ field, fieldState: { error } }) => (
                     <div>
@@ -533,7 +566,9 @@ export default function PostingForm() {
                         className={error ? "border-red-500" : ""}
                       />
                       {error && (
-                        <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {error.message}
+                        </p>
                       )}
                     </div>
                   )}
@@ -542,18 +577,19 @@ export default function PostingForm() {
             )}
           </div>
 
-          {/* Subdiv + Feeder - Only for Non-Grid Posting */}
+          {/* Sub Division / Feeder */}
           {!isGridPosting && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Sub Division */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
-                  Sub-Division *
+                  Sub-Division {!isXEN ? "*" : ""}
                 </label>
                 <Controller
                   name="sub_division_id"
                   control={control}
-                
+                  rules={{
+                    validate: validateSubDivision,
+                  }}
                   render={({ field, fieldState: { error } }) => (
                     <div>
                       <SearchSelect
@@ -567,14 +603,15 @@ export default function PostingForm() {
                         className={error ? "border-red-500" : ""}
                       />
                       {error && (
-                        <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                        <p className="mt-1 text-sm text-red-600">
+                          {error.message}
+                        </p>
                       )}
                     </div>
                   )}
                 />
               </div>
 
-              {/* Feeder - Optional */}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
                   Feeder
@@ -598,7 +635,7 @@ export default function PostingForm() {
             </div>
           )}
 
-          {/* Dates - Always Required */}
+          {/* Dates */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -622,7 +659,9 @@ export default function PostingForm() {
                       className={error ? "border-red-500" : ""}
                     />
                     {error && (
-                      <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {error.message}
+                      </p>
                     )}
                   </div>
                 )}
@@ -649,13 +688,17 @@ export default function PostingForm() {
                       }
                       minDate={
                         effectiveFrom
-                          ? new Date(new Date(effectiveFrom).getTime() + 86400000)
+                          ? new Date(
+                              new Date(effectiveFrom).getTime() + 86400000
+                            )
                           : new Date()
                       }
                       className={error ? "border-red-500" : ""}
                     />
                     {error && (
-                      <p className="mt-1 text-sm text-red-600">{error.message}</p>
+                      <p className="mt-1 text-sm text-red-600">
+                        {error.message}
+                      </p>
                     )}
                   </div>
                 )}
@@ -663,7 +706,6 @@ export default function PostingForm() {
             </div>
           </div>
 
-          {/* Submit Button */}
           <Button type="submit" variant="primary" className="w-fit py-3 text-sm">
             Save Posting
           </Button>

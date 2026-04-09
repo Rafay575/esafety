@@ -5,7 +5,7 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true, // 👈 allows sending cookies with requests
+  withCredentials: true, //  allows sending cookies with requests
 });
 
 api.interceptors.request.use((config) => {

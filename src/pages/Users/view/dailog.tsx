@@ -11,6 +11,7 @@ import { FormCheck } from "@/components/Base/Form";
 interface CreatePostingModalProps {
   open: boolean;
   userId: number;
+  roleName: string;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -29,6 +30,7 @@ interface PostingFormValues {
 export function CreatePostingModal({
   open,
   userId,
+  roleName,
   onClose,
   onCreated,
 }: CreatePostingModalProps) {
@@ -60,7 +62,7 @@ export function CreatePostingModal({
   const [feeders, setFeeders] = useState<any[]>([]);
   
   const [isGridPosting, setIsGridPosting] = useState(false);
-
+  const isXEN = roleName?.trim().toUpperCase() === "XEN";
   const regionId = watch("region_id");
   const circleId = watch("circle_id");
   const divisionId = watch("division_id");
@@ -116,7 +118,20 @@ export function CreatePostingModal({
     }
     return true;
   };
+const validateSubDivision = (value: number) => {
+  // Grid posting never needs sub division
+  if (isGridPosting) return true;
 
+  // XEN role does not require sub division
+  if (isXEN) return true;
+
+  // For all other non-grid roles, sub division is required
+  if (!value || value === 0) {
+    return "Sub Division is required";
+  }
+
+  return true;
+};
 
 
   const validateGrid = (value: number) => {
@@ -227,11 +242,11 @@ export function CreatePostingModal({
       } else {
         // Non-grid posting: include division and sub-division
         Object.assign(payload, {
-          division_id: values.division_id,
-          sub_division_id: values.sub_division_id,
-          feeder_id: values.feeder_id || null,
-          grid_id: null
-        });
+  division_id: values.division_id,
+  sub_division_id: values.sub_division_id || null,
+  feeder_id: values.feeder_id || null,
+  grid_id: null,
+});
       }
 
       await api.post("/api/v1/meta/user-postings", payload);
@@ -286,10 +301,12 @@ export function CreatePostingModal({
               </FormCheck.Label>
             </FormCheck>
             <p className="text-sm text-gray-500 mt-1">
-              {isGridPosting 
-                ? "Only Region, Circle, and Grid fields are required" 
-                : "Region, Circle, Division, and Sub Division fields are required"}
-            </p>
+  {isGridPosting
+    ? "Only Region, Circle, and Grid fields are required"
+    : isXEN
+      ? "Region, Circle, and Division fields are required. Sub Division is optional for XEN."
+      : "Region, Circle, Division, and Sub Division fields are required"}
+</p>
           </div>
 
           <form
@@ -447,39 +464,41 @@ export function CreatePostingModal({
                 </div>
 
                 {/* Sub Division - Only for Non-Grid Posting */}
-                <div>
-                  <label
-                    htmlFor="sub_division_id"
-                    className="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-300"
-                  >
-                    Sub Division *
-                  </label>
-                  <Controller
-                    name="sub_division_id"
-                    control={control}
-                
-                    render={({ field, fieldState: { error } }) => (
-                      <div>
-                        <SearchSelect
-                          {...field}
-                          className="w-full !mt-1"
-                          placeholder="Select Sub Division"
-                          options={subs.map((s) => ({
-                            value: s.id,
-                            label: s.code + " - " + s.name,
-                          }))}
-                          disabled={!divisionId || divisionId === 0}
-                        />
-                        {error && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {error.message}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  />
-                </div>
+              <div>
+  <label
+    htmlFor="sub_division_id"
+    className="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-300"
+  >
+    Sub Division {!isXEN ? "*" : ""}
+  </label>
 
+  <Controller
+    name="sub_division_id"
+    control={control}
+    rules={{
+      validate: validateSubDivision,
+    }}
+    render={({ field, fieldState: { error } }) => (
+      <div>
+        <SearchSelect
+          {...field}
+          className="w-full !mt-1"
+          placeholder="Select Sub Division"
+          options={subs.map((s) => ({
+            value: s.id,
+            label: s.code + " - " + s.name,
+          }))}
+          disabled={!divisionId || divisionId === 0}
+        />
+        {error && (
+          <p className="mt-1 text-sm text-red-600">
+            {error.message}
+          </p>
+        )}
+      </div>
+    )}
+  />
+</div>
                 {/* Feeder - Optional for Non-Grid Posting */}
                 <div>
                   <label

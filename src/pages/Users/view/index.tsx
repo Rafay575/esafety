@@ -131,7 +131,7 @@ export default function ViewUser() {
           <Info label="Last Login" value={formatDT(user.last_login_at)} />
         </Section>
         {/* ---------------- Posting History ---------------- */}
-        <PostingHistory userId={userId} />
+        <PostingHistory userId={userId} roleName={user.roles?.[0]?.name} />
       </div>
     </div>
   );
@@ -182,7 +182,7 @@ function formatDT(date?: string | null) {
 }
 
 
-function PostingHistory({ userId }: { userId: number }) {
+function PostingHistory({ userId, roleName }: { userId: number; roleName: string }) {
   const { data: history, isLoading, isError, refetch } = usePostingHistory(userId);
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -221,15 +221,16 @@ function PostingHistory({ userId }: { userId: number }) {
       </h2>
 
       {/* ---------- CREATE MODAL ---------- */}
-      <CreatePostingModal
-        open={createOpen}
-        userId={userId}
-        onClose={() => setCreateOpen(false)}
-        onCreated={() => {
-          setCreateOpen(false);
-          refetch();
-        }}
-      />
+     <CreatePostingModal
+  open={createOpen}
+  userId={userId}
+  roleName={roleName ?? ""}
+  onClose={() => setCreateOpen(false)}
+  onCreated={() => {
+    setCreateOpen(false);
+    refetch();
+  }}
+/>
 
       {/* ---------- EMPTY STATE ---------- */}
       {(!history || history.length === 0) && (
