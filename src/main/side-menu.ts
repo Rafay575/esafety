@@ -10,6 +10,7 @@ const getUserFromStorage = () => {
 
 const user = getUserFromStorage();
 const isAdmin = user?.roles?.includes("Admin") || false;
+const isMepcoIT = user?.roles?.includes("MepcoIT") || false; // Added MepcoIT role check
 const hasUserViewPermission =
   user?.permissions?.includes("users.view.any") || false;
 const hasPostingViewPermission =
@@ -37,7 +38,6 @@ if (hasPostingViewPermission) {
 }
 
 // Add E-Safety menu (always visible for now)
-
 menu.push({
   icon: "FileType",
   title: "E-Safety (PTW)",
@@ -57,30 +57,31 @@ if (isAdmin && (hasUserViewPermission || hasPostingViewPermission)) {
   menu.push("divider");
 }
 
-if (isAdmin || (hasReportingViewPermission)) {
-menu.push({
-  icon: "BarChart",
-  title: "Reports",
-  subMenu: [
-    {
-      icon: "TrendingUp",
-      title: "Esafety Performance",
-      pathname: "/reports/esafety-performance",
-    },
-  ],
-});
+if (isAdmin || hasReportingViewPermission) {
+  menu.push({
+    icon: "BarChart",
+    title: "Reports",
+    subMenu: [
+      {
+        icon: "TrendingUp",
+        title: "Esafety Performance",
+        pathname: "/reports/esafety-performance",
+      },
+    ],
+  });
 }
 
-
-// Add Organization menu if user is admin
+// Add Activity log if user is admin
 if (isAdmin) {
-
   menu.push({
     icon: "Activity",
     title: "Activity",
     pathname: "/activity-logs",
-    
-  })
+  });
+}
+
+// Add Organization menu if user is Admin OR MepcoIT
+if (isAdmin || isMepcoIT) {
   menu.push({
     icon: "Building2",
     title: "Organization",

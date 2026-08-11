@@ -20,6 +20,7 @@ function Main() {
   const navigate = useNavigate();
   const handlelogout = () => {
     dispatch(logout());
+   
     navigate("/login");
   };
   return (
