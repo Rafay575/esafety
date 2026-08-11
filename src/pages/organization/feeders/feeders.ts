@@ -3,7 +3,7 @@ import { api } from "@/lib/axios";
 export interface Feeder {
   id: number;
   sub_division_id: number;
-  grid_station_id?: number | null;
+  grid_station_id?: string | null;
   code: string;
   name: string;
   description?: string | null;
