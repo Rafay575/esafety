@@ -8,7 +8,7 @@ import {
   useSubDivisions,
 } from "./hooks";
 import Button from "@/components/Base/Button";
-import { BreakdownItem, ESafetyReportCountData, StatusCount } from "./types";
+import { BreakdownItem, ESafetyReportCountData, StatusCount, Status } from "./types";
 import autoTable from "jspdf-autotable"; 
 // Install these packages first:
 // npm install jspdf html2canvas
@@ -1025,7 +1025,7 @@ try {
                   {statusesQuery.isLoading && (
                     <option disabled>Loading statuses...</option>
                   )}
-                  {statusesQuery.data?.data.map((status: StatusCount & { id: number; label_en: string }) => (
+                  {statusesQuery.data?.data.map((status: Status) => (
                     <option key={status.id} value={status.code}>
                       {status.label_en}
                     </option>
@@ -1161,7 +1161,7 @@ try {
 
           {filters.status && (
             <Chip
-              label={`Status: ${statusesQuery.data?.data.find((s: StatusCount & { code: string; label_en: string }) => s.code === filters.status)?.label_en || filters.status}`}
+              label={`Status: ${statusesQuery.data?.data.find((s: Status) => s.code === filters.status)?.label_en || filters.status}`}
               onRemove={() => setFilters((prev) => ({ ...prev, status: "" }))}
             />
           )}
