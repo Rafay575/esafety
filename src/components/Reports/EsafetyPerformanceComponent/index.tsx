@@ -14,6 +14,13 @@ import autoTable from "jspdf-autotable";
 // npm install jspdf html2canvas
 import jsPDF from "jspdf";
 
+// Shared shape for the region/circle/division/sub-division dropdown options.
+// Adjust this if your hooks return additional fields.
+interface OptionItem {
+  value: number;
+  label: string;
+}
+
 const Main = () => {
   const report = useESafetyReportCount();
   const statusesQuery = useESafetyStatuses();
@@ -581,7 +588,7 @@ try {
                   {regionsQuery.isLoading && (
                     <option disabled>Loading regions...</option>
                   )}
-                  {regionsQuery.data?.map((region) => (
+                  {regionsQuery.data?.map((region: OptionItem) => (
                     <option key={region.value} value={region.value}>
                       {region.label}
                     </option>
@@ -662,7 +669,7 @@ try {
                   {circlesQuery.isLoading && (
                     <option disabled>Loading circles...</option>
                   )}
-                  {circlesQuery.data?.map((circle) => (
+                  {circlesQuery.data?.map((circle: OptionItem) => (
                     <option key={circle.value} value={circle.value}>
                       {circle.label}
                     </option>
@@ -747,7 +754,7 @@ try {
                   {divisionsQuery.isLoading && (
                     <option disabled>Loading divisions...</option>
                   )}
-                  {divisionsQuery.data?.map((division) => (
+                  {divisionsQuery.data?.map((division: OptionItem) => (
                     <option key={division.value} value={division.value}>
                       {division.label}
                     </option>
@@ -832,7 +839,7 @@ try {
                   {subDivisionsQuery.isLoading && (
                     <option disabled>Loading sub-divisions...</option>
                   )}
-                  {subDivisionsQuery.data?.map((subDivision) => (
+                  {subDivisionsQuery.data?.map((subDivision: OptionItem) => (
                     <option key={subDivision.value} value={subDivision.value}>
                       {subDivision.label}
                     </option>
@@ -1018,7 +1025,7 @@ try {
                   {statusesQuery.isLoading && (
                     <option disabled>Loading statuses...</option>
                   )}
-                  {statusesQuery.data?.data.map((status) => (
+                  {statusesQuery.data?.data.map((status: StatusCount & { id: number; label_en: string }) => (
                     <option key={status.id} value={status.code}>
                       {status.label_en}
                     </option>
@@ -1103,7 +1110,7 @@ try {
         <div className="mt-4 flex flex-wrap gap-2">
           {filters.region_id > 0 && (
             <Chip
-              label={`Region: ${regionsQuery.data?.find((r) => r.value === filters.region_id)?.label || filters.region_id}`}
+              label={`Region: ${regionsQuery.data?.find((r: OptionItem) => r.value === filters.region_id)?.label || filters.region_id}`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1118,7 +1125,7 @@ try {
 
           {filters.circle_id > 0 && (
             <Chip
-              label={`Circle: ${circlesQuery.data?.find((c) => c.value === filters.circle_id)?.label || filters.circle_id}`}
+              label={`Circle: ${circlesQuery.data?.find((c: OptionItem) => c.value === filters.circle_id)?.label || filters.circle_id}`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1132,7 +1139,7 @@ try {
 
           {filters.division_id > 0 && (
             <Chip
-              label={`Division: ${divisionsQuery.data?.find((d) => d.value === filters.division_id)?.label || filters.division_id}`}
+              label={`Division: ${divisionsQuery.data?.find((d: OptionItem) => d.value === filters.division_id)?.label || filters.division_id}`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1145,7 +1152,7 @@ try {
 
           {filters.sub_division_id > 0 && (
             <Chip
-              label={`Sub Division: ${subDivisionsQuery.data?.find((s) => s.value === filters.sub_division_id)?.label || filters.sub_division_id}`}
+              label={`Sub Division: ${subDivisionsQuery.data?.find((s: OptionItem) => s.value === filters.sub_division_id)?.label || filters.sub_division_id}`}
               onRemove={() =>
                 setFilters((prev) => ({ ...prev, sub_division_id: 0 }))
               }
@@ -1154,7 +1161,7 @@ try {
 
           {filters.status && (
             <Chip
-              label={`Status: ${statusesQuery.data?.data.find((s) => s.code === filters.status)?.label_en || filters.status}`}
+              label={`Status: ${statusesQuery.data?.data.find((s: StatusCount & { code: string; label_en: string }) => s.code === filters.status)?.label_en || filters.status}`}
               onRemove={() => setFilters((prev) => ({ ...prev, status: "" }))}
             />
           )}
