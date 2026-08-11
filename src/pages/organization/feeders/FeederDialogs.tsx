@@ -17,7 +17,7 @@ const feederSchema = yup.object({
     .number()
     .required("Sub-Division is required")
     .typeError("Sub-Division is required"),
-  grid_station_id: yup.number().nullable(),
+  grid_station_id: yup.string().nullable(),
   code: yup.string().trim().required("Code is required").max(20),
   name: yup.string().trim().required("Name is required").max(120),
   voltage_level: yup.string().nullable().max(20),
@@ -59,7 +59,7 @@ export function FeederFormDialog(props: {
     mode: "onChange",
     defaultValues: {
       sub_division_id: undefined as unknown as number,
-      grid_station_id: undefined as unknown as number,
+      grid_station_id: undefined as unknown as string,
       code: "",
       name: "",
       voltage_level: "",
@@ -174,7 +174,7 @@ export function FeederFormDialog(props: {
                       value={field.value ?? ""}
                       onChange={(e) =>
                         field.onChange(
-                          e.target.value === "" ? undefined : Number(e.target.value)
+                          e.target.value === "" ? undefined : (e.target.value)
                         )
                       }
                       className="mt-1"
