@@ -12,14 +12,11 @@ module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   darkMode: "class",
   theme: {
-     screens: {
-      sm: '640px',
-      md: '768px',
-      lg: '1024px',
-      xl: '1280px',
-      '2xl': '1536px',
-    },
+    
     extend: {
+      screens: {
+      xs: "480px", // or whatever value tw-starter expects
+    },
       colors: {
         theme: {
           1: "rgb(var(--color-theme-1) / <alpha-value>)",
@@ -95,6 +92,7 @@ module.exports = {
           "--color-light": toRGB(colors.slate["100"]),
           "--color-dark": toRGB(colors.slate["800"]),
         },
+        // Default dark-mode colors
         ".dark": {
           "--color-primary": toRGB(colors.blue["700"]),
           "--color-darkmode-50": "87 103 132",
@@ -108,6 +106,7 @@ module.exports = {
           "--color-darkmode-800": "27 37 59",
           "--color-darkmode-900": "15 23 42",
         },
+        // Theme 1 colors
         ".theme-1": {
           "--color-theme-1": toRGB(colors.emerald["800"]),
           "--color-theme-2": toRGB(colors.emerald["900"]),
@@ -124,6 +123,7 @@ module.exports = {
             "--color-primary": toRGB(colors.emerald["800"]),
           },
         },
+        // Theme 2 colors
         ".theme-2": {
           "--color-theme-1": toRGB(colors.blue["900"]),
           "--color-theme-2": toRGB(colors.blue["950"]),
@@ -140,6 +140,7 @@ module.exports = {
             "--color-primary": toRGB(colors.blue["800"]),
           },
         },
+        // Theme 3 colors
         ".theme-3": {
           "--color-theme-1": toRGB(colors.cyan["800"]),
           "--color-theme-2": toRGB(colors.cyan["900"]),
@@ -156,6 +157,7 @@ module.exports = {
             "--color-primary": toRGB(colors.cyan["800"]),
           },
         },
+        // Theme 4 colors
         ".theme-4": {
           "--color-theme-1": toRGB(colors.indigo["800"]),
           "--color-theme-2": toRGB(colors.indigo["900"]),
@@ -175,4 +177,4 @@ module.exports = {
       });
     }),
   ],
-};                                                                                                                                                                                                                                                                            
+};
