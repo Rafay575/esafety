@@ -30,30 +30,34 @@ export default function SituationOfLine({
   >([]);
   const [answers, setAnswers] = useState<Record<number, string>>({});
 
-  // -------- Fetch Checklist and Prefill if existing --------
+  // -------- Fetch Checklist & Prefill from Preview --------
   useEffect(() => {
-    const fetchChecklist = async () => {
+    const fetchChecklistAndPreview = async () => {
       try {
         setLoading(true);
 
-        // 🟢 Step 1: Fetch the base checklist template
-        const res = await api.get("/api/v1/admin/checklists?type=LINE_TYPE");
-        const checklistData = res.data?.data ?? [];
+        // Fetch both checklist definition and existing answers
+        const [checklistRes, previewRes] = await Promise.all([
+          api.get("/api/v1/admin/checklists?type=LINE_TYPE"),
+          api.get(`/api/v1/ptw/${id}/preview`),
+        ]);
 
-        // 🟢 Step 2: Fetch existing answers from PTW preview
-        // const preview = await api.get(`/api/v1/ptw/${id}/preview`);
-        const existingAnswers = [];
-
-        // 🟢 Step 3: Convert existing answers → { [itemId]: value }
-        // const prefilled: Record<number, string> = {};
-        // existingAnswers.forEach(
-        //   (a: { id: number; value: string | null }) => {
-        //     if (a.value) prefilled[a.id] = a.value;
-        //   }
-        // );
-
+        const checklistData = checklistRes.data?.data ?? [];
         setChecklist(checklistData);
-        setAnswers([]);
+
+        // Extract existing LINE_TYPE answers from preview
+        const lineTypeItems = previewRes.data?.data?.checklists?.LINE_TYPE;
+        if (Array.isArray(lineTypeItems)) {
+          const prefill: Record<number, string> = {};
+          lineTypeItems.forEach((item: any) => {
+            if (item.value === "YES" || item.value === "NO") {
+              prefill[item.id] = item.value;
+            }
+          });
+          setAnswers(prefill);
+        } else {
+          setAnswers({});
+        }
       } catch (err) {
         console.error(err);
         toast.error("Failed to load checklist or preview data");
@@ -62,7 +66,7 @@ export default function SituationOfLine({
       }
     };
 
-    fetchChecklist();
+    fetchChecklistAndPreview();
   }, [id]);
 
   // -------- Handle Answer Change --------

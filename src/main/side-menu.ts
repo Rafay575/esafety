@@ -10,7 +10,7 @@ const getUserFromStorage = () => {
 
 const user = getUserFromStorage();
 const isAdmin = user?.roles?.includes("Admin") || false;
-const isMepcoIT = user?.roles?.includes("MepcoIT") || false; // Added MepcoIT role check
+const isMepcoIT = user?.roles?.includes("MepcoIT") || false;
 const hasUserViewPermission =
   user?.permissions?.includes("users.view.any") || false;
 const hasPostingViewPermission =
@@ -18,17 +18,16 @@ const hasPostingViewPermission =
 const hasReportingViewPermission =
   user?.permissions?.includes("reports.view.esaftyPerformance") || false;
 
-// Start building the menu
 const menu: Array<Menu | "divider"> = [
   { icon: "Home", title: "Dashboard", pathname: "/" },
 ];
 
-// Add Users if user has permission
+// Users
 if (hasUserViewPermission) {
-  menu.push({ icon: "User", title: "Users", pathname: "/users" });
+  menu.push({ icon: "Users", title: "Users", pathname: "/users" });
 }
 
-// Add User Posting if user has permission
+// User Posting
 if (hasPostingViewPermission) {
   menu.push({
     icon: "SignpostBig",
@@ -37,9 +36,9 @@ if (hasPostingViewPermission) {
   });
 }
 
-// Add E-Safety menu (always visible for now)
+// E-Safety (PTW)
 menu.push({
-  icon: "FileType",
+  icon: "FileType2",  // changed from "FileType" to "FileType2" (more common in Lucide)
   title: "E-Safety (PTW)",
   ignore: true,
   subMenu: [
@@ -52,35 +51,56 @@ menu.push({
   ],
 });
 
-// Add divider if we have items before Organization
+// Divider
 if (isAdmin && (hasUserViewPermission || hasPostingViewPermission)) {
   menu.push("divider");
 }
 
+// Reports
 if (isAdmin || hasReportingViewPermission) {
   menu.push({
-    icon: "BarChart",
+    icon: "BarChart3",  // changed from "BarChart" to "BarChart3" (standard Lucide)
     title: "Reports",
-    subMenu: [
-      {
-        icon: "TrendingUp",
-        title: "Esafety Performance",
-        pathname: "/reports/esafety-performance",
-      },
-    ],
+   subMenu: [
+  {
+    icon: "Gauge",               // Esafety Performance
+    title: "Esafety Performance",
+    pathname: "/reports/esafety-performance",
+  },
+  {
+    icon: "AlertTriangle",       // Emergent PTW Report
+    title: "Emergent PTW Report",
+    pathname: "/reports/emergent-ptwreport",
+  },
+  {
+    icon: "Clock",               // PTW Delay Report
+    title: "PTW Delay Report",
+    pathname: "/reports/ptwdelay-report",
+  },
+  {
+    icon: "PieChart",            // PTW Type-Wise Report
+    title: "PTW Type-Wise Report",
+    pathname: "/reports/ptwtype-wise",
+  },
+],
   });
 }
 
-// Add Activity log if user is admin
+// Admin-only items
 if (isAdmin) {
   menu.push({
-    icon: "Activity",
+    icon: "History",      // changed from "Activity" to "History" (more appropriate for logs)
     title: "Activity",
     pathname: "/activity-logs",
   });
+  menu.push({
+    icon: "Radio",        // changed from "Activity" to "Radio" (sessions)
+    title: "Sessions",
+    pathname: "/sessions",
+  });
 }
 
-// Add Organization menu if user is Admin OR MepcoIT
+// Organization (Admin or MepcoIT)
 if (isAdmin || isMepcoIT) {
   menu.push({
     icon: "Building2",
@@ -88,23 +108,11 @@ if (isAdmin || isMepcoIT) {
     subMenu: [
       { icon: "Map", title: "Regions", pathname: "/organization/regions" },
       { icon: "Circle", title: "Circles", pathname: "/organization/circles" },
-      {
-        icon: "Layers",
-        title: "Divisions",
-        pathname: "/organization/divisions",
-      },
-      {
-        icon: "GitBranch",
-        title: "Sub-Divisions",
-        pathname: "/organization/subdivisions",
-      },
+      { icon: "Layers", title: "Divisions", pathname: "/organization/divisions" },
+      { icon: "GitBranch", title: "Sub-Divisions", pathname: "/organization/subdivisions" },
       { icon: "Zap", title: "Feeders", pathname: "/organization/feeders" },
-      {
-        icon: "Antenna",
-        title: "Transformer",
-        pathname: "/organization/transformer",
-      },
-      { icon: "Zap", title: "Grid", pathname: "/organization/grid" },
+      { icon: "TowerControl", title: "Transformer", pathname: "/organization/transformer" }, // changed from "Antenna" to "TowerControl" (more fitting)
+      { icon: "Grid3x3", title: "Grid", pathname: "/organization/grid" }, // changed from "Grid" to "Grid3x3" (valid Lucide)
     ],
   });
 }

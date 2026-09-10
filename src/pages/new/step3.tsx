@@ -2,12 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Button from "@/components/Base/Button";
-import { FormTextarea } from "@/components/Base/Form";
 import FormCheck from "@/components/Base/Form/FormCheck";
 import { api } from "@/lib/axios";
 import { toast } from "sonner";
 
-// Types for the new response
 type Precaution = {
   id: number;
   label_en: string;
@@ -21,11 +19,6 @@ type Hazard = {
   precautions: Precaution[];
 };
 
-// For "other hazard" – we'll treat it specially if needed
-// The response includes id: 25 "Danger of tools/equipment falling..." – no "other" item anymore.
-// We'll keep the "other" field as a textarea if needed, but the new data doesn't include it.
-// If you still need a free‑text hazard, you may add it manually.
-
 export default function HazardIdentificationChecklist({
   id,
   next,
@@ -37,46 +30,48 @@ export default function HazardIdentificationChecklist({
 }) {
   const [loading, setLoading] = useState(true);
   const [hazards, setHazards] = useState<Hazard[]>([]);
-  // State for each hazard: { value: "YES"/"NO", precautions: number[] }
   const [answers, setAnswers] = useState<
     Record<number, { value: string; precautions: number[] }>
   >({});
-  const [otherText, setOtherText] = useState("");
 
-  // -------- Fetch Hazards + existing answers --------
+  // -------- Fetch Hazards + Prefill from Preview --------
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // 1. Fetch hazards with precautions
-        const res = await api.get("/api/v1/admin/checklists/hazards-with-precautions");
-        const hazardsData: Hazard[] = res.data?.data ?? [];
+        // Fetch hazards with precautions and existing PTW preview
+        const [hazardsRes, previewRes] = await Promise.all([
+          api.get("/api/v1/admin/checklists/hazards-with-precautions"),
+          api.get(`/api/v1/ptw/${id}/preview`),
+        ]);
+
+        const hazardsData: Hazard[] = hazardsRes.data?.data ?? [];
         setHazards(hazardsData);
 
-        // 2. Fetch existing PTW data to prefill (if any)
-        // const preview = await api.get(`/api/v1/ptw/${id}/preview`);
-        // const existingAnswers = preview.data?.data?.checklists?.HAZARDS ?? [];
-        // const existingPrecautions = preview.data?.data?.hazard_precautions ?? [];
+        // Extract existing HAZARDS answers from preview
+        const hazardItems = previewRes.data?.data?.checklists?.HAZARDS ?? [];
+        const prefilled: Record<number, { value: string; precautions: number[] }> = {};
 
-        // Build prefilled answers
-        // const prefilled: Record<number, { value: string; precautions: number[] }> = {};
-        // existingAnswers.forEach((a: { id: number; value: string | null }) => {
-        //   if (a.value) {
-        //     prefilled[a.id] = {
-        //       value: a.value,
-        //       precautions: existingPrecautions[a.id] || [], // assuming backend returns mapping
-        //     };
-        //   }
-        // });
-        // setAnswers(prefilled);
+        hazardItems.forEach((item: any) => {
+          const hazard = hazardsData.find((h) => h.id === item.id);
+          if (!hazard) return;
 
-        // If no existing data, default all to NO with empty precautions
-        const defaultAnswers: Record<number, { value: string; precautions: number[] }> = {};
-        hazardsData.forEach((h) => {
-          defaultAnswers[h.id] = { value: "NO", precautions: [] };
+          prefilled[item.id] = {
+            value: item.value === "YES" ? "YES" : "NO",
+            // Auto‑select all precautions if YES, matching existing UI behavior
+            precautions: item.value === "YES" ? hazard.precautions.map((p) => p.id) : [],
+          };
         });
-        setAnswers(defaultAnswers);
+
+        // Default any missing hazards to NO with empty precautions
+        hazardsData.forEach((h) => {
+          if (!prefilled[h.id]) {
+            prefilled[h.id] = { value: "NO", precautions: [] };
+          }
+        });
+
+        setAnswers(prefilled);
       } catch (err) {
         console.error(err);
         toast.error("Failed to load hazards");
@@ -94,8 +89,8 @@ export default function HazardIdentificationChecklist({
       const hazard = hazards.find((h) => h.id === hazardId);
       if (!hazard) return prev;
 
-      // If switching to YES, pre‑check all precautions
-      const precautions = newValue === "YES" ? hazard.precautions.map((p) => p.id) : [];
+      const precautions =
+        newValue === "YES" ? hazard.precautions.map((p) => p.id) : [];
 
       return {
         ...prev,
@@ -107,7 +102,7 @@ export default function HazardIdentificationChecklist({
     });
   };
 
-  // -------- Handle precaution checkbox toggle --------
+  // -------- Handle precaution checkbox toggle (though they are disabled) --------
   const togglePrecaution = (hazardId: number, precautionId: number) => {
     setAnswers((prev) => {
       const current = prev[hazardId];
@@ -131,38 +126,17 @@ export default function HazardIdentificationChecklist({
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Build payload
-    const formattedAnswers = Object.entries(answers).map(([hazardIdStr, ans]) => {
-      const hazardId = Number(hazardIdStr);
-      return {
-        checklist_item_id: hazardId,
-        value: ans.value,
-     
-      };
-    });
-
-    // Optionally include the "other" text if we still have it
-    // We'll add it as a special entry if needed
-    if (otherText.trim()) {
-      // Assuming there's a special hazard for "Other"
-      const otherHazard = hazards.find((h) => h.label_en.toLowerCase().includes("other"));
-      if (otherHazard) {
-        formattedAnswers.push({
-          checklist_item_id: otherHazard.id,
-          value: "YES",
-        
-          // need to extend type
-        });
-      }
-    }
+    const formattedAnswers = Object.entries(answers).map(([hazardIdStr, ans]) => ({
+      checklist_item_id: Number(hazardIdStr),
+      value: ans.value,
+    }));
 
     console.log("🚀 Submitting Payload:", formattedAnswers);
 
     try {
-      // You may need a different endpoint – step3-hazards might not accept this new structure.
-      // If the backend expects the old format, you'll have to adapt.
-      // I'll assume a new endpoint /step3-hazards-v2 or we keep the same but adjust backend.
-      await api.post(`/api/v1/ptw/${id}/step3-hazards`, { answers: formattedAnswers });
+      await api.post(`/api/v1/ptw/${id}/step3-hazards`, {
+        answers: formattedAnswers,
+      });
       toast.success("Hazard checklist saved successfully!");
       next();
     } catch (err) {
@@ -172,13 +146,11 @@ export default function HazardIdentificationChecklist({
   };
 
   const onReset = () => {
-    // Reset to default: all NO, no precautions
     const defaultAnswers: Record<number, { value: string; precautions: number[] }> = {};
     hazards.forEach((h) => {
       defaultAnswers[h.id] = { value: "NO", precautions: [] };
     });
     setAnswers(defaultAnswers);
-    setOtherText("");
   };
 
   if (loading)
@@ -222,7 +194,6 @@ export default function HazardIdentificationChecklist({
                   key={hazard.id}
                   className="rounded-lg border border-slate-200 p-4 hover:bg-slate-50"
                 >
-                  {/* Hazard title (bilingual) */}
                   <div className="text-sm font-semibold text-slate-800">
                     {hazard.label_en}
                   </div>
@@ -233,7 +204,6 @@ export default function HazardIdentificationChecklist({
                     {hazard.label_ur}
                   </div>
 
-                  {/* YES / NO Radios */}
                   <div className="flex gap-6 mb-3">
                     {["YES", "NO"].map((val) => (
                       <label
@@ -256,7 +226,6 @@ export default function HazardIdentificationChecklist({
                     ))}
                   </div>
 
-                  {/* Precautions (only if YES) */}
                   {showPrecautions && hazard.precautions.length > 0 && (
                     <div className="ml-4 mt-2 space-y-2 border-l-2 border-primary/30 pl-4 intro-x">
                       <p className="text-xs font-medium text-slate-600">
@@ -284,7 +253,6 @@ export default function HazardIdentificationChecklist({
                     </div>
                   )}
 
-                  {/* If no precautions but YES selected, show a message */}
                   {showPrecautions && hazard.precautions.length === 0 && (
                     <div className="ml-4 mt-2 text-xs text-slate-400 italic">
                       No specific precautions listed.
@@ -293,12 +261,8 @@ export default function HazardIdentificationChecklist({
                 </div>
               );
             })}
-
-            {/* Optional "Other hazard" free text field (if needed) */}
-            {/* You can add a separate section for "Other" if your data doesn't include it */}
           </div>
 
-          {/* Buttons */}
           <div className="mt-8 flex justify-end gap-3">
             <Button type="button" variant="outline-secondary" onClick={back}>
               Back / واپس جائیں

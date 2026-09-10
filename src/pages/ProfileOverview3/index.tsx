@@ -31,6 +31,7 @@ function Main() {
   const prevTodaySchedules = () => {
     todaySchedulesRef.current?.tns.goTo("prev");
   };
+
   const nextTodaySchedules = () => {
     todaySchedulesRef.current?.tns.goTo("next");
   };

@@ -1,33 +1,65 @@
 // src/pages/users/UsersListPage.tsx
 "use client";
 
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { GenericTable, Column, TableAction } from "@/components/Base/GenericTable";
 import { useUsers, useDebouncedValue, type OrgUserRow } from "./hooks";
 import Button from "@/components/Base/Button";
 import Lucide from "@/components/Base/Lucide";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/lib/axios";
+import { toast } from "sonner";
+import { Loader } from "lucide-react";
 
 export default function UsersListPage() {
   const navigate = useNavigate();
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+
+  // Modal state
+  const [userToToggle, setUserToToggle] = useState<OrgUserRow | null>(null);
+  const [isToggleModalOpen, setIsToggleModalOpen] = useState(false);
 
   // UI state
   const [page, setPage] = React.useState(1);
-  const [perPage, setPerPage] = React.useState(10); // <- default per_page
+  const [perPage, setPerPage] = React.useState(10);
   const [search, setSearch] = React.useState("");
 
-  // Debounce search to reduce API spam
   const debouncedSearch = useDebouncedValue(search, 400);
 
-  // Reset page when search/perPage changes
   React.useEffect(() => {
     setPage(1);
   }, [debouncedSearch, perPage]);
 
-  // Fetch
   const { data, isLoading, isError, refetch } = useUsers(page, perPage, debouncedSearch);
   const users = (data?.rows ?? []) as OrgUserRow[];
   const total = data?.meta?.total ?? 0;
+
+  const openToggleModal = (user: OrgUserRow) => {
+    setUserToToggle(user);
+    setIsToggleModalOpen(true);
+  };
+
+  const closeToggleModal = () => {
+    setUserToToggle(null);
+    setIsToggleModalOpen(false);
+  };
+
+  const handleToggleConfirm = async () => {
+    if (!userToToggle) return;
+
+    const action = userToToggle.status === "Active" ? "deactivate" : "activate";
+    setTogglingId(userToToggle.id);
+    try {
+      await api.post(`/api/v1/users/${userToToggle.id}/toggle`);
+      toast.success(`User ${action}d successfully`);
+      closeToggleModal();
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || `Failed to ${action} user`);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   // Columns
   const columns: Column<OrgUserRow>[] = React.useMemo(
@@ -102,7 +134,7 @@ export default function UsersListPage() {
     []
   );
 
-  // Actions (icons must match GenericTable's union)
+  // Actions
   const actions: TableAction<OrgUserRow>[] = React.useMemo(
     () => [
       {
@@ -115,7 +147,11 @@ export default function UsersListPage() {
         icon: "PencilLine",
         onClick: (row) => navigate(`/users/${row.id}/edit`),
       },
-     
+      {
+        label: "Toggle Active",
+        icon: "Power",
+        onClick: (row) => openToggleModal(row),
+      },
     ],
     [navigate]
   );
@@ -129,25 +165,72 @@ export default function UsersListPage() {
 
   return (
     <div className="my-5">
-
-    <GenericTable
-      title="Organization & Users"
-      data={users}
-      columns={columns}
-      actions={actions}
-      loading={isLoading}
-      error={isError ? "Failed to load users." : null}
-      onRetry={() => refetch()}
-      toolbarActions={toolbarActions}
-      // 🔻 API-driven pagination + search (wired to your hook)
-      page={page}
-      perPage={perPage}
-      total={total}
-      search={search}
-      onSearchChange={setSearch}
-      onPageChange={setPage}
-      onPerPageChange={setPerPage}
+      <GenericTable
+        title="Organization & Users"
+        data={users}
+        columns={columns}
+        actions={actions}
+        loading={isLoading}
+        error={isError ? "Failed to load users." : null}
+        onRetry={() => refetch()}
+        toolbarActions={toolbarActions}
+        page={page}
+        perPage={perPage}
+        total={total}
+        search={search}
+        onSearchChange={setSearch}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
       />
-      </div>
+
+      {/* Toggle Confirmation Modal */}
+      {isToggleModalOpen && userToToggle && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-0 !mt-0" style={{ zIndex: 9999 }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                  <Lucide icon="AlertTriangle" className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {userToToggle.status === "Active" ? "Deactivate User" : "Activate User"}
+                </h3>
+              </div>
+              <button
+                onClick={closeToggleModal}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <Lucide icon="X" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-4 text-sm text-slate-600">
+              Are you sure you want to {userToToggle.status === "Active" ? "deactivate" : "activate"}{" "}
+              <span className="font-semibold">{userToToggle.name}</span>?
+              This will change their access status immediately.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="outline-secondary" onClick={closeToggleModal}>
+                Cancel
+              </Button>
+              <Button
+                variant={userToToggle.status === "Active" ? "danger" : "primary"}
+                onClick={handleToggleConfirm}
+                disabled={togglingId === userToToggle.id}
+                className="flex items-center gap-2"
+              >
+                {togglingId === userToToggle.id ? (
+                  <Loader className="animate-spin" size={16} />
+                ) : (
+                  <Lucide icon="Power" className="h-4 w-4" />
+                )}
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

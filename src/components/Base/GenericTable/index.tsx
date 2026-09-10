@@ -26,7 +26,8 @@ export interface TableAction<T> {
     | "Trash2"
     | "Edit"
     | "Settings"
-    | "MoreHorizontal";
+    | "MoreHorizontal"|
+    "Power"
   onClick: (row: T) => void;
   variant?: "default" | "danger";
 }

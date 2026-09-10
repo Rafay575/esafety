@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ClipboardList,
@@ -14,26 +15,30 @@ import Button from "@/components/Base/Button";
 import PTW_SingleForm_BilingualLabels from "../new/step1";
 import SituationOfLine from "../new/step2";
 import HazardIdentificationChecklist from "../new/step3";
-
-import PTWPreview from "../new/step4"; // ✅ Your preview component path
+import PTWPreview from "../new/step4";
 
 const STEPS = [
   { id: 1, title: "Part A – Basic Information", ur: "حصہ اوّل – بنیادی معلومات", icon: ClipboardList },
   { id: 2, title: "Situation of Line", ur: "لائن کی صورتحال", icon: ActivitySquare },
   { id: 3, title: "Safety Hazards", ur: "حفاظتی خطرات", icon: ShieldAlert },
-  { id: 6, title: "PTW Preview", ur: "جائزہ", icon: FileSearch }, // ✅ NEW STEP
+  { id: 6, title: "PTW Preview", ur: "جائزہ", icon: FileSearch },
 ] as const;
 
 export default function PTW_StepperWizardFinal() {
-  const [step, setStep] = useState<number>(1);
-  const [id, setId] = useState<number>(0);
+  // ✅ Read id from URL query param (?id=123)
+  const [searchParams] = useSearchParams();
+  const urlId = searchParams.get("id");
+  const initialId = urlId ? Number(urlId) : 0;
+
+  const [step, setStep] = useState<number>(1); // start at step 1
+  const [id, setId] = useState<number>(initialId);
 
   const percent = useMemo(() => Math.round((step / STEPS.length) * 100), [step]);
   const current = useMemo(() => STEPS.find((s) => s.id === step)!, [step]);
 
   const next = () => setStep((s) => Math.min(STEPS.length, s + 1));
   const back = () => setStep((s) => Math.max(1, s - 1));
- 
+
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -42,9 +47,8 @@ export default function PTW_StepperWizardFinal() {
         return <SituationOfLine id={id} next={next} back={back} />;
       case 3:
         return <HazardIdentificationChecklist id={id} next={next} back={back} />;
-    
       case 4:
-        return <PTWPreview id={id} back={back}/>; // ✅ PREVIEW STEP
+        return <PTWPreview id={id} back={back} />;
       default:
         return null;
     }
@@ -130,9 +134,6 @@ export default function PTW_StepperWizardFinal() {
             <div className="p-4 md:p-6">{renderStep()}</div>
           </motion.div>
         </AnimatePresence>
-
-        {/* Navigation Buttons */}
-      
       </main>
     </div>
   );

@@ -118,6 +118,13 @@ export default function PlannedScheduleModal({
       toast.error("End date must be greater than or equal to start date.");
       return;
     }
+     const diffTime = b.getTime() - a.getTime();
+  const inclusiveDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  if (inclusiveDays > 5) {
+    toast.error("Maximum 5 days allowed for planned schedule.");
+    return;
+  }
 
     const days: PlannedScheduleRow[] = [];
     let cur = a;

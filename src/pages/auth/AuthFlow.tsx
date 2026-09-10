@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthStage } from "./types";
@@ -9,6 +8,7 @@ import OtpForm from "./OtpForm";
 import ResetForm from "./ResetForm";
 import { useLogin, useSendOtp, useVerifyOtp, useResetPassword } from "./hooks";
 import { useNavigate } from "react-router-dom";
+import { registerForPushNotifications } from "@/lib/fcm"; // adjust import path
 
 type Direction = "FWD" | "BACK";
 
@@ -19,7 +19,7 @@ export default function AuthFlow() {
   const [otp, setOtp] = useState("");
   const navigate = useNavigate();
   const [resetToken, setResetToken] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(false);
   const login = useLogin();
   const sendOtp = useSendOtp();
   const verifyOtp = useVerifyOtp();
@@ -35,65 +35,68 @@ export default function AuthFlow() {
     password: string;
     remember: boolean;
   }) => {
-    // backend expects "username"
     const res = await login.mutateAsync({
       username: payload.email,
       password: payload.password,
     });
     localStorage.setItem("auth_token", res.token);
     localStorage.setItem("auth_user", JSON.stringify(res.user));
+
+    // 🔔 Set up push notifications (fire-and-forget, no await)
+    registerForPushNotifications();
+
     navigate("/");
   };
 
   const onSendOtp = async (payload: { email: string }) => {
-  setLoading(true);
-  try {
-    setEmail(payload.email);
-    await sendOtp.mutateAsync({ username: payload.email });
-    go(AuthStage.OTP, "FWD");
-  } catch (err) {
-    // optional: extra local handling/logging
-    // toast handled in the hook already
-  } finally {
-    setLoading(false); // runs on success OR error
-  }
-};
+    setLoading(true);
+    try {
+      setEmail(payload.email);
+      await sendOtp.mutateAsync({ username: payload.email });
+      go(AuthStage.OTP, "FWD");
+    } catch (err) {
+      // toast handled in the hook already
+    } finally {
+      setLoading(false);
+    }
+  };
 
- const onVerifyOtp = async (payload: { otp: string }) => {
-  setLoading(true);
-  try {
-    setOtp(payload.otp);
-    const res = await verifyOtp.mutateAsync({
-      username: email,
-      otp: payload.otp,
-    });
-    if (res?.reset_token) setResetToken(res.reset_token);
-    go(AuthStage.RESET, "FWD");
-  } catch (err) {
-    // optional: extra local handling (toasts likely already in hook)
-  } finally {
-    setLoading(false);
-  }
-};
+  const onVerifyOtp = async (payload: { otp: string }) => {
+    setLoading(true);
+    try {
+      setOtp(payload.otp);
+      const res = await verifyOtp.mutateAsync({
+        username: email,
+        otp: payload.otp,
+      });
+      if (res?.reset_token) setResetToken(res.reset_token);
+      go(AuthStage.RESET, "FWD");
+    } catch (err) {
+      // toast handled in the hook already
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const onReset = async (payload: {
-  newPassword: string;
-  confirmPassword: string;
-}) => {
-  setLoading(true);
-  try {
-    await resetPw.mutateAsync({
-      reset_token: resetToken,
-      password: payload.newPassword,
-      password_confirmation: payload.confirmPassword,
-    });
-    go(AuthStage.LOGIN, "BACK");
-  } catch (err) {
-    // optional handling
-  } finally {
-    setLoading(false);
-  }
-};
+  const onReset = async (payload: {
+    newPassword: string;
+    confirmPassword: string;
+  }) => {
+    setLoading(true);
+    try {
+      await resetPw.mutateAsync({
+        reset_token: resetToken,
+        password: payload.newPassword,
+        password_confirmation: payload.confirmPassword,
+      });
+      go(AuthStage.LOGIN, "BACK");
+    } catch (err) {
+      // toast handled in the hook already
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const variants = direction === "FWD" ? slideLeftVariants : slideRightVariants;
 
   return (

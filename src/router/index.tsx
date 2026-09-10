@@ -43,7 +43,13 @@ import ViewUser from "@/pages/Users/view";
 import PostingForm from "@/pages/UserPosting";
 import GridStationListPage from "@/pages/organization/grid";
 import Esafetyperformance from "@/pages/Reports/Esafetyperformance";
+import Emergentptwreport from "@/pages/Reports/Emergentptwreport";
+import Ptwdelayreport from "@/pages/Reports/Ptwdelayreport";
 import ActivityLog from "@/pages/ActivityLog";
+import Ptwtypewisereport from "@/pages/Reports/Ptwtypewisereport";
+import Profile from "@/pages/profile";
+import NotificationsPage from "@/pages/notifications";
+import GridSessionsPage from "@/pages/sessions";
 function Router() {
   const routes = [
       {
@@ -86,6 +92,18 @@ function Router() {
         {
           path: "/reports/esafety-performance",
           element: <Esafetyperformance />,
+        },
+        {
+          path: "/reports/emergent-ptwreport",
+          element: <Emergentptwreport />,
+        },
+        {
+          path: "/reports/ptwdelay-report",
+          element: <Ptwdelayreport />,
+        },
+        {
+          path: "/reports/ptwtype-wise",
+          element: <Ptwtypewisereport />,
         },
       
         {
@@ -199,8 +217,21 @@ function Router() {
     
       
           {
+          path: "/profile",
+          element: <Profile />,
+        },
+      
+          {
           path: "/activity-logs",
           element: <ActivityLog />,
+        },
+          {
+          path: "/notifications",
+          element: <NotificationsPage />,
+        },
+          {
+          path: "/sessions",
+          element: <GridSessionsPage/>,
         },
       
  

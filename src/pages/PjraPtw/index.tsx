@@ -21,6 +21,7 @@ type PTW = {
   scheduled_start_at: string | null;
   due_time: string | null;
   current_status: string;
+  status_label_en: string;
   feeder?: { id: number; name: string; code: string };
   sub_division?: { id: number; name: string };
   ls?: { id: number; name: string };
@@ -105,6 +106,7 @@ const PTW_STATUS_OPTIONS = [
   "RE_SUBMITTED_TO_PDC",
   "NO_PTW_APPROVED_BY_SDO",
 ] as const;
+
 export default function PTWListPage() {
   const navigate = useNavigate();
 
@@ -157,16 +159,16 @@ export default function PTWListPage() {
       label: "Status",
       render: (p: PTW) => {
         const color =
-          p.current_status === "DRAFT"
+          p.status_label_en === "DRAFT"
             ? "bg-amber-100 text-amber-800"
-            : p.current_status === "APPROVED"
+            : p.status_label_en === "APPROVED"
               ? "bg-green-100 text-green-800"
               : "bg-slate-100 text-slate-600";
         return (
           <span
             className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}
           >
-            {p.current_status}
+            {p.status_label_en}
           </span>
         );
       },
@@ -187,40 +189,38 @@ export default function PTWListPage() {
   return (
     <div className="p-6 space-y-4">
       {/* ✅ Filters UI */}
-        <div className="mt-3 flex w-full justify-end gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setFilters({
-                status: "",
-                from_date: "",
-                to_date: "",
-                sort_by: "updated_at",
-                sort_dir: "desc",
-              });
-              resetToFirstPage();
-            }}
-          >
-            Reset Filters
-          </Button>
+      <div className="mt-3 flex w-full justify-end gap-2">
+  <Button
+    variant="secondary"
+    onClick={() => {
+      setFilters({
+        status: "",
+        from_date: "",
+        to_date: "",
+        sort_by: "updated_at",
+        sort_dir: "desc",
+      });
+      resetToFirstPage();
+    }}
+  >
+    Reset Filters
+  </Button>
 
-          <Button variant="secondary" onClick={() => refetch()}>
-            Refresh
-          </Button>
-            <Button
-            variant="primary"
-            onClick={() => {
-              if (userRoles.includes("LS")) navigate("/ptw");
-              else
-                toast.error(
-                  `Not allowed for role: ${userRoles.join(", ") || "Unknown"}`,
-                );
-            }}
-          >
-            <Lucide icon="Plus" className="w-4 h-4 mr-2" />
-            New PTW
-          </Button>
-        </div>
+  <Button variant="secondary" onClick={() => refetch()}>
+    Refresh
+  </Button>
+
+  {/* ✅ Show New PTW only for LS role */}
+  {userRoles.includes("LS") && (
+    <Button
+      variant="primary"
+      onClick={() => navigate("/ptw")}
+    >
+      <Lucide icon="Plus" className="w-4 h-4 mr-2" />
+      New PTW
+    </Button>
+  )}
+</div>
       <div className="rounded-lg border bg-white p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
           {/* status */}
@@ -331,21 +331,7 @@ export default function PTWListPage() {
           setPerPage(n);
           setPage(1);
         }}
-        // toolbarActions={
-        //   <Button
-        //     variant="primary"
-        //     onClick={() => {
-        //       if (userRoles.includes("LS")) navigate("/ptw");
-        //       else
-        //         toast.error(
-        //           `Not allowed for role: ${userRoles.join(", ") || "Unknown"}`,
-        //         );
-        //     }}
-        //   >
-        //     <Lucide icon="Plus" className="w-4 h-4 mr-2" />
-        //     New PTW
-        //   </Button>
-        // }
+      
       />
     </div>
   );

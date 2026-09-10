@@ -58,7 +58,51 @@ const formSchema = z.object({
 });
 
 type FormData = z.infer<typeof formSchema>;
+const normalizeYesNo = (val: any): "YES" | "NO" => {
+  if (
+    val === true ||
+    val === "true" ||
+    val === 1 ||
+    val === "1" ||
+    val === "YES" ||
+    val === "yes"
+  ) {
+    return "YES";
+  }
+  if (
+    val === false ||
+    val === "false" ||
+    val === 0 ||
+    val === "0" ||
+    val === "NO" ||
+    val === "no"
+  ) {
+    return "NO";
+  }
+  return "YES"; // default fallback
+};
 
+const flattenFeeders = (
+  grouped: any,
+  type: "primary" | "secondary",
+): Feeder[] => {
+  const result: Feeder[] = [];
+  if (!grouped || typeof grouped !== "object") return result;
+
+  Object.values(grouped).forEach((grid: any) => {
+    const feeders = grid?.feeders?.[type];
+    if (Array.isArray(feeders)) {
+      feeders.forEach((f: any) => {
+        result.push({
+          id: f.id,
+          name: f.name,
+          code: f.code,
+        });
+      });
+    }
+  });
+  return result;
+};
 const getGoogleMapsApiKey = (): string => {
   if (
     typeof import.meta !== "undefined" &&
@@ -97,7 +141,7 @@ export default function PTW_SingleForm_BilingualLabels({
     feederName?: string;
     transformerName?: string;
   }>({});
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // ---------- React Hook Form ----------
   const {
     control,
@@ -184,8 +228,13 @@ export default function PTW_SingleForm_BilingualLabels({
   // Auto‑fetch location when map loads (only for new PTWs and if fields are empty)
   useEffect(() => {
     if (!isLoaded || !map || !geocoderRef.current) return;
-    if (id) return; // skip for existing PTWs
-    if (watch("location_lat") && watch("location_lng") && watch("location_text")) return;
+
+    if (
+      watch("location_lat") &&
+      watch("location_lng") &&
+      watch("location_text")
+    )
+      return;
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -228,7 +277,14 @@ export default function PTW_SingleForm_BilingualLabels({
     } else {
       toast.error("Geolocation not supported by this browser");
     }
-  }, [isLoaded, map, id, watch("location_lat"), watch("location_lng"), watch("location_text")]);
+  }, [
+    isLoaded,
+    map,
+    id,
+    watch("location_lat"),
+    watch("location_lng"),
+    watch("location_text"),
+  ]);
 
   // Marker drag handler
   const onMarkerDragEnd = (e: google.maps.MapMouseEvent) => {
@@ -320,28 +376,34 @@ export default function PTW_SingleForm_BilingualLabels({
           const { data } = await api.get(`/api/v1/ptw/${id}/preview`);
           const p = data?.data?.ptw;
 
+          // Flatten grouped feeder structure directly from API shape
+          const flatPrimary = flattenFeeders(p?.primary_feeders, "primary");
+          const flatSecondary = flattenFeeders(p?.primary_feeders, "secondary");
+
           setPreviewNames({
-            feederName: p?.feeder_name ?? undefined,
             transformerName: p?.transformer_name ?? undefined,
           });
 
-          // Set all form values from preview
+          // Set all simple form values from preview
           setValue("type", p?.type || "MISC");
           setValue("misc_type", p?.misc_type || "");
           setValue("reference_no", p?.reference_no || "");
-          setValue("circuit_type", p?.circuit_type || "SINGLE");
-          setValue("is_ptw_required", p?.is_ptw_required || "YES");
+          setValue("is_ptw_required", normalizeYesNo(p?.is_ptw_required));
           setValue("feeder_incharge_name", p?.feeder_incharge_name || "");
           setValue("place_of_work", p?.place_of_work || "");
           setValue("scope_of_work", p?.scope_of_work || "");
           setValue("safety_arrangements", p?.safety_arrangements || "");
           setValue(
             "scheduled_start_at",
-            p?.scheduled_start_at ? String(p.scheduled_start_at).replace(" ", "T") : "",
+            p?.scheduled_start_at
+              ? String(p.scheduled_start_at).replace(" ", "T")
+              : "",
           );
           setValue(
             "estimated_duration_min",
-            p?.estimated_duration_min != null ? String(p.estimated_duration_min) : "",
+            p?.estimated_duration_min != null
+              ? String(p.estimated_duration_min)
+              : "",
           );
           setValue("switch_off_time", p?.switch_off_time || "");
           setValue("restore_time", p?.restore_time || "");
@@ -352,12 +414,33 @@ export default function PTW_SingleForm_BilingualLabels({
           setValue("planned_to_date", p?.planned_to_date || "");
           setValue(
             "planned_schedule",
-            Array.isArray(p?.planned_schedule) ? (p.planned_schedule as PlannedScheduleRow[]) : [],
+            Array.isArray(p?.planned_schedule)
+              ? (p.planned_schedule as PlannedScheduleRow[])
+              : [],
           );
           setValue(
             "team_member_ids",
-            Array.isArray(p?.team_members) ? p.team_members.map((m: { id: number }) => m.id) : [],
+            Array.isArray(p?.team_members)
+              ? p.team_members.map((m: { id: number }) => m.id)
+              : [],
           );
+
+          // Feeder-derived fields — set these LAST, in this order,
+          // so the SINGLE->clear-secondary effect resolves against final state
+          if (flatPrimary.length) {
+            setValue("feeder_id", String(flatPrimary[0].id));
+          }
+
+          if (flatSecondary.length) {
+            setValue(
+              "secondary_feeder_ids",
+              flatSecondary.map((f) => f.id),
+            );
+            setValue("circuit_type", "MULTI");
+          } else {
+            setValue("secondary_feeder_ids", []);
+            setValue("circuit_type", "SINGLE");
+          }
 
           // Evidences are handled separately (state below)
           if (p?.type === "PLANNED" && !Array.isArray(p?.planned_schedule)) {
@@ -388,7 +471,6 @@ export default function PTW_SingleForm_BilingualLabels({
     }
   }, [watchType, watchIsPtwRequired, setValue]);
 
-  // Auto-select first primary feeder on SINGLE
   useEffect(() => {
     if (watchCircuitType !== "SINGLE") return;
     if (watchFeederId) return;
@@ -406,7 +488,12 @@ export default function PTW_SingleForm_BilingualLabels({
       (f) => f.name === previewNames.feederName,
     );
     if (match) setValue("feeder_id", String(match.id));
-  }, [previewNames.feederName, context.primary_feeders, watchFeederId, setValue]);
+  }, [
+    previewNames.feederName,
+    context.primary_feeders,
+    watchFeederId,
+    setValue,
+  ]);
 
   // Fetch transformers when feeder changes
   useEffect(() => {
@@ -443,7 +530,13 @@ export default function PTW_SingleForm_BilingualLabels({
   }, [previewNames.transformerName, transformers, watch, setValue]);
 
   // ---------- Evidence state (kept separate because files) ----------
-  const [evidences, setEvidences] = useState<(File | null)[]>([null, null, null, null, null]);
+  const [evidences, setEvidences] = useState<(File | null)[]>([
+    null,
+    null,
+    null,
+    null,
+    null,
+  ]);
   const [existingEvidences, setExistingEvidences] = useState<
     { id: number; file_path: string; type: string }[]
   >([]);
@@ -517,8 +610,12 @@ export default function PTW_SingleForm_BilingualLabels({
     }
 
     // Log the entire form state for debugging
-    console.log("📋 Form State on Submit:", { ...data, evidences, existingEvidences });
-
+    console.log("📋 Form State on Submit:", {
+      ...data,
+      evidences,
+      existingEvidences,
+    });
+    setIsSubmitting(true);
     const fd = new FormData();
     (
       [
@@ -619,7 +716,10 @@ export default function PTW_SingleForm_BilingualLabels({
       console.error("Submit error:", error);
       toast.error("Failed to save PTW data");
       next();
+    } finally {
+      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   const formatTime = (t: string) => {
@@ -680,12 +780,13 @@ export default function PTW_SingleForm_BilingualLabels({
           open={plannedOpen}
           onClose={() => {
             setPlannedOpen(false);
-            // If planned schedule is incomplete, revert to MISC
+            const liveType = watch("type");
+            const liveSchedule = watch("planned_schedule");
             if (
-              watchType === "PLANNED" &&
+              liveType === "PLANNED" &&
               (!watch("planned_from_date") ||
                 !watch("planned_to_date") ||
-                !watchPlannedSchedule?.length)
+                !liveSchedule?.length)
             ) {
               setValue("type", "MISC");
             }
@@ -693,7 +794,11 @@ export default function PTW_SingleForm_BilingualLabels({
           initialFrom={watch("planned_from_date") || undefined}
           initialTo={watch("planned_to_date") || undefined}
           initialSchedule={watchPlannedSchedule || undefined}
-          onSave={({ planned_from_date, planned_to_date, planned_schedule }) => {
+          onSave={({
+            planned_from_date,
+            planned_to_date,
+            planned_schedule,
+          }) => {
             setValue("planned_from_date", planned_from_date);
             setValue("planned_to_date", planned_to_date);
             setValue("planned_schedule", planned_schedule);
@@ -869,6 +974,8 @@ export default function PTW_SingleForm_BilingualLabels({
                         <option value="SCO">SCO</option>
                         <option value="RCO">RCO</option>
                         <option value="DCO">DCO</option>
+                        <option value="SJO">SJO</option>
+                        <option value="ERO">ERO</option>
                         <option value="COMPLAINT">COMPLAINT</option>
                       </FormSelect>
                     )}
@@ -1171,9 +1278,7 @@ export default function PTW_SingleForm_BilingualLabels({
               Use my current location
             </Button>
           </div>
-          {/* ---------- End Location Section ---------- */}
 
-          {/* Team Members */}
           <div>
             <FormLabel>
               Team Members / <span className="font-urdu">ٹیم ممبرز</span>
@@ -1316,15 +1421,20 @@ export default function PTW_SingleForm_BilingualLabels({
             <Button type="reset" variant="outline-secondary">
               Reset / <span className="font-urdu">ری سیٹ</span>
             </Button>
-            <Button type="submit" variant="primary">
-              {id ? (
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isSubmitting} // disable while loading
+            >
+              {isSubmitting ? (
                 <>
-                  Update / <span className="font-urdu">اپ ڈیٹ</span>
+                  <Loader className="animate-spin" size={16} />
+                  Submitting...
                 </>
+              ) : id ? (
+                "Update / اپ ڈیٹ"
               ) : (
-                <>
-                  Submit / <span className="font-urdu">جمع کروائیں</span>
-                </>
+                "Submit / جمع کروائیں"
               )}
             </Button>
           </div>
