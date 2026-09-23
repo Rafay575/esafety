@@ -96,40 +96,40 @@ function toRow(u: any): OrgUserRow {
     updatedAt: u.updated_at ?? u.created_at ?? new Date().toISOString(),
   };
 }
-
-/** Fetcher (kept separate for testability) */
 async function fetchUsers(params: {
   page: number;
   perPage: number;
   search: string;
+  role?: string;
 }) {
-  const { page, perPage, search } = params;
+  const { page, perPage, search, role } = params;
 
   const { data } = await api.get("/api/v1/users", {
     params: {
       page,
       per_page: perPage,
-      // backend expects `search=...` (as per your note)
-      // if your backend uses `q` instead, just swap the key
       search: search || undefined,
+      role: role || undefined,
     },
   });
 
-  // Expecting shape: { data: User[], meta: { total, per_page, current_page, ... } }
   const rows: OrgUserRow[] = (data?.data ?? []).map(toRow);
   const total: number = data?.total ?? rows.length;
 
   return { rows, meta: { total } };
 }
 
-/** Main hook */
-export function useUsers(page: number, perPage: number, search: string) {
+export function useUsers(
+  page: number,
+  perPage: number,
+  search: string,
+  role?: string,
+) {
   return useQuery({
-    queryKey: ["users", { page, perPage, search }],
-    queryFn: () => fetchUsers({ page, perPage, search }),
+    queryKey: ["users", { page, perPage, search, role }],
+    queryFn: () => fetchUsers({ page, perPage, search, role }),
   });
 }
-
 /** Tiny debounce hook for search */
 export function useDebouncedValue<T>(value: T, delay = 400) {
   const [debounced, setDebounced] = React.useState(value);

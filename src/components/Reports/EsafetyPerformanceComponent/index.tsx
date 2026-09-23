@@ -9,13 +9,9 @@ import {
 } from "./hooks";
 import Button from "@/components/Base/Button";
 import { BreakdownItem, ESafetyReportCountData, StatusCount, Status } from "./types";
-import autoTable from "jspdf-autotable"; 
-// Install these packages first:
-// npm install jspdf html2canvas
+import autoTable from "jspdf-autotable";
 import jsPDF from "jspdf";
 
-// Shared shape for the region/circle/division/sub-division dropdown options.
-// Adjust this if your hooks return additional fields.
 interface OptionItem {
   value: number;
   label: string;
@@ -48,6 +44,20 @@ const Main = () => {
     from_date: "2026-01-01",
     to_date: "2026-02-04",
   });
+
+  // ✅ NEW: Auto-select the first region once regions are loaded.
+  // Since only one region is available, this removes the manual step
+  // and immediately enables the Circle dropdown.
+  useEffect(() => {
+    if (
+      regionsQuery.data &&
+      regionsQuery.data.length > 0 &&
+      filters.region_id === 0
+    ) {
+      const firstRegionId = regionsQuery.data[0].value;
+      setFilters((prev) => ({ ...prev, region_id: firstRegionId }));
+    }
+  }, [regionsQuery.data, filters.region_id]);
 
   // Reset child selections when parent changes
   useEffect(() => {
@@ -100,7 +110,6 @@ const Main = () => {
   ) => {
     const { name, value } = e.target;
 
-    // Handle hierarchy resets
     if (name === "region_id") {
       const regionId = value === "0" ? 0 : parseInt(value);
       setFilters((prev) => ({
@@ -131,7 +140,6 @@ const Main = () => {
     } else if (name === "status") {
       setFilters((prev) => ({ ...prev, [name]: value }));
     } else {
-      // Handle date inputs
       setFilters((prev) => ({ ...prev, [name]: value }));
     }
   };
@@ -139,7 +147,6 @@ const Main = () => {
   const onGenerate = () => {
     if (!canGenerate) return;
 
-    // Prepare params - convert 0 values to empty strings for API
     const params = {
       region_id:
         filters.region_id > 0 ? filters.region_id.toString() : undefined,
@@ -159,291 +166,250 @@ const Main = () => {
     report.mutate(params);
   };
 
+  const loadPngAsResizedDataURL = async (
+    url: string,
+    targetMaxWidthPx = 220
+  ): Promise<string> => {
+    const res = await fetch(url, { cache: "force-cache" });
+    if (!res.ok) throw new Error(`Failed to load image: ${url}`);
 
-// const loadImageAsDataURL = async (url: string): Promise<string> => {
-//   const res = await fetch(url);
-//   const blob = await res.blob();
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
 
-//   return await new Promise((resolve) => {
-//     const img = new Image();
-//     img.onload = () => {
-//       const canvas = document.createElement("canvas");
-//       canvas.width = img.width;
-//       canvas.height = img.height;
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
 
-//       const ctx = canvas.getContext("2d");
-//       ctx?.drawImage(img, 0, 0);
+      img.onload = () => {
+        const scale = Math.min(1, targetMaxWidthPx / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
 
-//       // 🔥 reduce quality to 0.6
-//       const compressed = canvas.toDataURL("image/jpeg", 0.6);
-//       resolve(compressed);
-//     };
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
 
-//     img.src = URL.createObjectURL(blob);
-//   });
-// };
+        const ctx = canvas.getContext("2d");
+        ctx?.clearRect(0, 0, w, h);
+        ctx?.drawImage(img, 0, 0, w, h);
 
-const loadPngAsResizedDataURL = async (
-  url: string,
-  targetMaxWidthPx = 220
-): Promise<string> => {
-  const res = await fetch(url, { cache: "force-cache" });
-  if (!res.ok) throw new Error(`Failed to load image: ${url}`);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL("image/png"));
+      };
 
-  const blob = await res.blob();
-  const objectUrl = URL.createObjectURL(blob);
-
-  return await new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
-    img.onload = () => {
-      const scale = Math.min(1, targetMaxWidthPx / img.width);
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, w, h); // ✅ keep transparency
-      ctx?.drawImage(img, 0, 0, w, h);
-
-      URL.revokeObjectURL(objectUrl);
-
-      resolve(canvas.toDataURL("image/png")); // ✅ PNG output
-    };
-
-    img.onerror = reject;
-    img.src = objectUrl;
-  });
-};
-
-
-
-const handleDownloadPDF = async () => {
-  if (!data) {
-    alert("No report data available to download.");
-    return;
-  }
-
-  setIsGeneratingPDF(true);
-
-  try {
-    // ✅ landscape A4
-    const pdf = new jsPDF({
-  orientation: "landscape",
-  unit: "mm",
-  format: "a4",
-  compress: true,       // 🔥 VERY IMPORTANT
-  precision: 2,         // reduces internal float precision
-});
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-
-    // ✅ load logo
-   let logoDataUrl: string | null = null;
-try {
-  logoDataUrl = await loadPngAsResizedDataURL("/logo.png", 150);
-} catch (e) {
-  console.warn("Logo load failed, continuing without logo.", e);
-}
-
-
-    // --- header layout ---
-    const headerTop = 10;
-
-    // ✅ Draw logo top-left
-    if (logoDataUrl) {
-      pdf.addImage(logoDataUrl, "PNG", 10, headerTop - 4, 22, 22);
-
-
-    }
-
-    // ✅ reserve space for logo on the left so filters won't overlap
-    const hasLogo = !!logoDataUrl;
-    const logoW = hasLogo ? 22 : 0;
-    const logoX = 10;
-    const logoGap = hasLogo ? 6 : 0;
-
-    const leftX = hasLogo ? logoX + logoW + logoGap : 10;
-    const usableWidth = pageWidth - leftX - 10; // right margin 10
-
-    // ✅ Title centered
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(14);
-    pdf.text("PTW Performance Report", pageWidth / 2, headerTop + 2, {
-      align: "center",
+      img.onerror = reject;
+      img.src = objectUrl;
     });
+  };
 
-    // ✅ Generated line centered
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, headerTop + 7, {
-      align: "center",
-    });
-
-    // ✅ Total + Date Range centered
-    pdf.setFontSize(9);
-    pdf.text(
-      `Total PTW Count: ${data.total_ptw_count}   |   Date Range: ${data.filters.from_date} to ${data.filters.to_date}`,
-      pageWidth / 2,
-      headerTop + 13,
-      { align: "center" }
-    );
-
-    // ✅ Applied Filters block (left, after logo space)
-    const filterLines: string[] = [];
-
-    if (data.breadcrumb?.circle) {
-      filterLines.push(
-        `Circle: ${data.breadcrumb.circle.name} (${data.breadcrumb.circle.code})`,
-      );
-    }
-    if (data.breadcrumb?.division) {
-      filterLines.push(
-        `Division: ${data.breadcrumb.division.name} (${data.breadcrumb.division.code})`,
-      );
-    }
-    if (data.breadcrumb?.sub_division) {
-      filterLines.push(
-        `Sub Division: ${data.breadcrumb.sub_division.name} (${data.breadcrumb.sub_division.code})`,
-      );
-    }
-    if (data.filters.status && data.filters.status !== "null") {
-      filterLines.push(`Status: ${data.filters.status}`);
+  const handleDownloadPDF = async () => {
+    if (!data) {
+      alert("No report data available to download.");
+      return;
     }
 
-    filterLines.push(`From: ${data.filters.from_date}`);
-    filterLines.push(`To: ${data.filters.to_date}`);
+    setIsGeneratingPDF(true);
 
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.text("Applied Filters:", leftX, headerTop + 18);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-
-    const filtersText = filterLines.join("   |   ");
-    const wrapped = pdf.splitTextToSize(filtersText, usableWidth);
-    pdf.text(wrapped, leftX, headerTop + 22);
-
-    // ✅ table start after filters (no overlap)
-    const filtersHeight = wrapped.length * 4; // each line ~4mm
-    const tableStartY = headerTop + 26 + filtersHeight + 6;
-
-    // ✅ status columns once
-    const statusCols = getAllStatusColumns(data.breakdown);
-
-    // --- Table head/body ---
-    const head = [
-      [
-        data.breakdown_type === "circles"
-          ? "Circle"
-          : data.breakdown_type === "divisions"
-            ? "Division"
-            : "Sub Division",
-        "Total",
-        ...statusCols.map((s) =>
-          s.short_label_en.replace(/_/g, " ").toUpperCase(),
-        ),
-      ],
-    ];
-
-    const body = data.breakdown.map((item) => {
-      const row: (string | number)[] = [];
-      row.push(`${item.code} - ${item.name}`);
-      row.push(item.total_ptw_count);
-
-      statusCols.forEach((status) => {
-        const found = item.statuses.find((x) => x.code === status.code);
-        row.push(found?.count ? found.count : "-");
+    try {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+        precision: 2,
       });
 
-      return row;
-    });
+      const pageWidth = pdf.internal.pageSize.getWidth();
 
-    // Totals row
-    const totalsRow: (string | number)[] = ["TOTAL", data.total_ptw_count];
-    statusCols.forEach((status) => {
-      const total = data.breakdown.reduce((sum, item) => {
-        const found = item.statuses.find((x) => x.code === status.code);
-        return sum + (found?.count || 0);
-      }, 0);
-      totalsRow.push(total > 0 ? total : "-");
-    });
-    body.push(totalsRow);
+      let logoDataUrl: string | null = null;
+      try {
+        logoDataUrl = await loadPngAsResizedDataURL("/logo.png", 150);
+      } catch (e) {
+        console.warn("Logo load failed, continuing without logo.", e);
+      }
 
-    // ✅ AutoTable (center align except name column, gray header, no row splitting)
-    autoTable(pdf, {
-      startY: tableStartY,
-      head,
-      body,
-      theme: "grid",
+      const headerTop = 10;
+      if (logoDataUrl) {
+        pdf.addImage(logoDataUrl, "PNG", 10, headerTop - 4, 22, 22);
+      }
 
-      styles: {
-        font: "helvetica",
-        fontSize: 7,       // ✅ smaller font
-        cellPadding: 1.2,
-        valign: "middle",
-        halign: "center",  // ✅ center by default
-        lineWidth: 0.1,
-      },
+      const hasLogo = !!logoDataUrl;
+      const logoW = hasLogo ? 22 : 0;
+      const logoX = 10;
+      const logoGap = hasLogo ? 6 : 0;
 
-      headStyles: {
-        fillColor: [71, 85, 105], // ✅ gray header
-        textColor: 255,           // ✅ white text
-        fontStyle: "bold",
-        halign: "center",
-      },
+      const leftX = hasLogo ? logoX + logoW + logoGap : 10;
+      const usableWidth = pageWidth - leftX - 10;
 
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(14);
+      pdf.text("PTW Performance Report", pageWidth / 2, headerTop + 2, {
+        align: "center",
+      });
 
-      columnStyles: {
-        0: {
-          halign: "left",        // ✅ name column left
-          cellWidth: 45,         // ✅ smaller first column
-          overflow: "linebreak",
-        },
-        1: {
-          halign: "center",
-          cellWidth: 12,
-          fontStyle: "bold",
-        },
-      },
-
-      rowPageBreak: "avoid", // ✅ don't split rows across pages
-      pageBreak: "auto",
-
-      margin: { left: 8, right: 8 },
-
-      didParseCell: (hook) => {
-        const isTotalRow = hook.row.index === body.length - 1;
-        if (isTotalRow) {
-          hook.cell.styles.fillColor = [226, 232, 240];
-          hook.cell.styles.fontStyle = "bold";
-          hook.cell.styles.textColor = [15, 23, 42];
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.text(
+        `Generated: ${new Date().toLocaleString()}`,
+        pageWidth / 2,
+        headerTop + 7,
+        {
+          align: "center",
         }
-      },
-    });
+      );
 
-    // ✅ safe filename
-    const safe = (s: string) => s.replace(/[\/\\:*?"<>|]/g, "-").trim();
-    const filename = `PTW-Report-${safe(data.breadcrumb?.circle?.name || "All")}-${safe(
-      data.breadcrumb?.division?.name || "All",
-    )}-${data.filters.from_date}-to-${data.filters.to_date}.pdf`;
+      pdf.setFontSize(9);
+      pdf.text(
+        `Total PTW Count: ${data.total_ptw_count}   |   Date Range: ${data.filters.from_date} to ${data.filters.to_date}`,
+        pageWidth / 2,
+        headerTop + 13,
+        { align: "center" }
+      );
 
-    pdf.save(filename);
-  } catch (err) {
-    console.error(err);
-    alert("Failed to generate PDF. Please try again.");
-  } finally {
-    setIsGeneratingPDF(false);
-  }
-};
+      const filterLines: string[] = [];
+
+      if (data.breadcrumb?.circle) {
+        filterLines.push(
+          `Circle: ${data.breadcrumb.circle.name} (${data.breadcrumb.circle.code})`,
+        );
+      }
+      if (data.breadcrumb?.division) {
+        filterLines.push(
+          `Division: ${data.breadcrumb.division.name} (${data.breadcrumb.division.code})`,
+        );
+      }
+      if (data.breadcrumb?.sub_division) {
+        filterLines.push(
+          `Sub Division: ${data.breadcrumb.sub_division.name} (${data.breadcrumb.sub_division.code})`,
+        );
+      }
+      if (data.filters.status && data.filters.status !== "null") {
+        filterLines.push(`Status: ${data.filters.status}`);
+      }
+
+      filterLines.push(`From: ${data.filters.from_date}`);
+      filterLines.push(`To: ${data.filters.to_date}`);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text("Applied Filters:", leftX, headerTop + 18);
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+
+      const filtersText = filterLines.join("   |   ");
+      const wrapped = pdf.splitTextToSize(filtersText, usableWidth);
+      pdf.text(wrapped, leftX, headerTop + 22);
+
+      const filtersHeight = wrapped.length * 4;
+      const tableStartY = headerTop + 26 + filtersHeight + 6;
+
+      const statusCols = getAllStatusColumns(data.breakdown);
+
+      const head = [
+        [
+          data.breakdown_type === "circles"
+            ? "Circle"
+            : data.breakdown_type === "divisions"
+              ? "Division"
+              : "Sub Division",
+          "Total",
+          ...statusCols.map((s) =>
+            s.short_label_en.replace(/_/g, " ").toUpperCase(),
+          ),
+        ],
+      ];
+
+      const body = data.breakdown.map((item) => {
+        const row: (string | number)[] = [];
+        row.push(`${item.code} - ${item.name}`);
+        row.push(item.total_ptw_count);
+
+        statusCols.forEach((status) => {
+          const found = item.statuses.find((x) => x.code === status.code);
+          row.push(found?.count ? found.count : "-");
+        });
+
+        return row;
+      });
+
+      const totalsRow: (string | number)[] = ["TOTAL", data.total_ptw_count];
+      statusCols.forEach((status) => {
+        const total = data.breakdown.reduce((sum, item) => {
+          const found = item.statuses.find((x) => x.code === status.code);
+          return sum + (found?.count || 0);
+        }, 0);
+        totalsRow.push(total > 0 ? total : "-");
+      });
+      body.push(totalsRow);
+
+      autoTable(pdf, {
+        startY: tableStartY,
+        head,
+        body,
+        theme: "grid",
+
+        styles: {
+          font: "helvetica",
+          fontSize: 7,
+          cellPadding: 1.2,
+          valign: "middle",
+          halign: "center",
+          lineWidth: 0.1,
+        },
+
+        headStyles: {
+          fillColor: [71, 85, 105],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+
+        columnStyles: {
+          0: {
+            halign: "left",
+            cellWidth: 45,
+            overflow: "linebreak",
+          },
+          1: {
+            halign: "center",
+            cellWidth: 12,
+            fontStyle: "bold",
+          },
+        },
+
+        rowPageBreak: "avoid",
+        pageBreak: "auto",
+
+        margin: { left: 8, right: 8 },
+
+        didParseCell: (hook) => {
+          const isTotalRow = hook.row.index === body.length - 1;
+          if (isTotalRow) {
+            hook.cell.styles.fillColor = [226, 232, 240];
+            hook.cell.styles.fontStyle = "bold";
+            hook.cell.styles.textColor = [15, 23, 42];
+          }
+        },
+      });
+
+      const safe = (s: string) => s.replace(/[\/\\:*?"<>|]/g, "-").trim();
+      const filename = `PTW-Report-${safe(data.breadcrumb?.circle?.name || "All")}-${safe(
+        data.breadcrumb?.division?.name || "All",
+      )}-${data.filters.from_date}-to-${data.filters.to_date}.pdf`;
+
+      pdf.save(filename);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const getBreakdownTitle = (
     data: ESafetyReportCountData | undefined,
@@ -470,10 +436,9 @@ try {
     breakdown.forEach((item) => {
       item.statuses.forEach((status) => {
         if (!statusMap.has(status.code)) {
-          // Format the short label: remove underscores and convert to uppercase
           const formattedStatus = {
             ...status,
-            short_label_en: status.short_label_en.replace(/_/g, ' ').toUpperCase(),
+            short_label_en: status.short_label_en.replace(/_/g, " ").toUpperCase(),
             count: 0,
           };
           statusMap.set(status.code, formattedStatus);
@@ -481,7 +446,6 @@ try {
       });
     });
 
-    // Sort statuses alphabetically by the formatted short label
     return Array.from(statusMap.values()).sort((a, b) =>
       a.short_label_en.localeCompare(b.short_label_en),
     );
@@ -502,7 +466,6 @@ try {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* PDF Download Button - only show when report is generated */}
           {report.isSuccess && (
             <Button
               type="button"
@@ -518,8 +481,18 @@ try {
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Download PDF
                 </>
@@ -1066,6 +1039,8 @@ try {
               <button
                 type="button"
                 onClick={() => {
+                  // Reset everything. Region will be auto-selected
+                  // again by the effect on the next tick.
                   setFilters({
                     region_id: 0,
                     circle_id: 0,
@@ -1110,7 +1085,11 @@ try {
         <div className="mt-4 flex flex-wrap gap-2">
           {filters.region_id > 0 && (
             <Chip
-              label={`Region: ${regionsQuery.data?.find((r: OptionItem) => r.value === filters.region_id)?.label || filters.region_id}`}
+              label={`Region: ${
+                regionsQuery.data?.find(
+                  (r: OptionItem) => r.value === filters.region_id,
+                )?.label || filters.region_id
+              }`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1125,7 +1104,11 @@ try {
 
           {filters.circle_id > 0 && (
             <Chip
-              label={`Circle: ${circlesQuery.data?.find((c: OptionItem) => c.value === filters.circle_id)?.label || filters.circle_id}`}
+              label={`Circle: ${
+                circlesQuery.data?.find(
+                  (c: OptionItem) => c.value === filters.circle_id,
+                )?.label || filters.circle_id
+              }`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1139,7 +1122,11 @@ try {
 
           {filters.division_id > 0 && (
             <Chip
-              label={`Division: ${divisionsQuery.data?.find((d: OptionItem) => d.value === filters.division_id)?.label || filters.division_id}`}
+              label={`Division: ${
+                divisionsQuery.data?.find(
+                  (d: OptionItem) => d.value === filters.division_id,
+                )?.label || filters.division_id
+              }`}
               onRemove={() =>
                 setFilters((prev) => ({
                   ...prev,
@@ -1152,7 +1139,11 @@ try {
 
           {filters.sub_division_id > 0 && (
             <Chip
-              label={`Sub Division: ${subDivisionsQuery.data?.find((s: OptionItem) => s.value === filters.sub_division_id)?.label || filters.sub_division_id}`}
+              label={`Sub Division: ${
+                subDivisionsQuery.data?.find(
+                  (s: OptionItem) => s.value === filters.sub_division_id,
+                )?.label || filters.sub_division_id
+              }`}
               onRemove={() =>
                 setFilters((prev) => ({ ...prev, sub_division_id: 0 }))
               }
@@ -1161,7 +1152,11 @@ try {
 
           {filters.status && (
             <Chip
-              label={`Status: ${statusesQuery.data?.data.find((s: Status) => s.code === filters.status)?.label_en || filters.status}`}
+              label={`Status: ${
+                statusesQuery.data?.data.find(
+                  (s: Status) => s.code === filters.status,
+                )?.label_en || filters.status
+              }`}
               onRemove={() => setFilters((prev) => ({ ...prev, status: "" }))}
             />
           )}
@@ -1170,10 +1165,6 @@ try {
 
       {/* Result */}
       <div className="grid grid-cols-12 gap-5 mt-5">
-        {/* Count Card */}
-      
-
-        {/* Breadcrumb + Filters Summary */}
         <div className="col-span-12" ref={reportRef}>
           <div className="box p-5">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
@@ -1227,19 +1218,28 @@ try {
                   {data?.filters?.circle_id &&
                     data.filters.circle_id !== "null" && (
                       <Chip
-                        label={`Circle: ${data.breadcrumb?.circle?.name || data.filters.circle_id}`}
+                        label={`Circle: ${
+                          data.breadcrumb?.circle?.name ||
+                          data.filters.circle_id
+                        }`}
                       />
                     )}
                   {data?.filters?.division_id &&
                     data.filters.division_id !== "null" && (
                       <Chip
-                        label={`Division: ${data.breadcrumb?.division?.name || data.filters.division_id}`}
+                        label={`Division: ${
+                          data.breadcrumb?.division?.name ||
+                          data.filters.division_id
+                        }`}
                       />
                     )}
                   {data?.filters?.sub_division_id &&
                     data.filters.sub_division_id !== "null" && (
                       <Chip
-                        label={`Sub Division: ${data.breadcrumb?.sub_division?.name || data.filters.sub_division_id}`}
+                        label={`Sub Division: ${
+                          data.breadcrumb?.sub_division?.name ||
+                          data.filters.sub_division_id
+                        }`}
                       />
                     )}
                   {data?.filters?.status && data.filters.status !== "null" && (
@@ -1258,14 +1258,15 @@ try {
                   {getBreakdownTitle(data)}
                 </div>
                 <div className="overflow-auto">
-                  {/* Table for divisions or sub-divisions with status columns */}
                   <table className="w-full">
                     <thead>
                       <tr className="bg-slate-100 border-y border-slate-200">
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
-                          {data?.breakdown_type==="circles"? "Circle" : data?.breakdown_type === "divisions"
-                            ? "Division"
-                            : "Sub Division"}
+                          {data?.breakdown_type === "circles"
+                            ? "Circle"
+                            : data?.breakdown_type === "divisions"
+                              ? "Division"
+                              : "Sub Division"}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">
                           Total
@@ -1291,11 +1292,11 @@ try {
                     </thead>
                     <tbody>
                       {data?.breakdown.map((item, index) => (
-                        <tr 
-                          key={item.id} 
+                        <tr
+                          key={item.id}
                           className={`
-                            border-b border-slate-100 
-                            ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}
+                            border-b border-slate-100
+                            ${index % 2 === 0 ? "bg-white" : "bg-slate-50"}
                             hover:bg-slate-100
                           `}
                         >
@@ -1328,7 +1329,6 @@ try {
                         </tr>
                       ))}
                     </tbody>
-                    {/* Totals row */}
                     <tfoot className="border-t border-slate-200">
                       <tr className="bg-slate-50">
                         <td className="px-4 py-3 text-sm font-semibold">

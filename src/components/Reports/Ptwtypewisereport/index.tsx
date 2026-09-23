@@ -1,11 +1,12 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import Button from "@/components/Base/Button";
 import autoTable from "jspdf-autotable";
 import jsPDF from "jspdf";
-import { api } from "@/lib/axios"; // assumes axios instance
+import { api } from "@/lib/axios";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
-// Types (adapted to new response)
+// Types
 // ---------------------------------------------------------------------------
 
 interface OptionItem {
@@ -32,9 +33,18 @@ interface DetailedRecord {
   division: string;
   sub_division: string;
   feeder: string;
-  issued_at: string; // already formatted
+  issued_at: string;
   duration: string | null;
   status: string;
+}
+
+interface PaginationBlock {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  next_page_url?: string | null;
+  prev_page_url?: string | null;
 }
 
 interface ReportData {
@@ -45,6 +55,7 @@ interface ReportData {
     circle_id: number | null;
     division_id: number | null;
     sub_division_id: number | null;
+    statuses?: string[];
     from: string;
     to: string;
     types: string[];
@@ -52,102 +63,249 @@ interface ReportData {
   total_ptws: number;
   summary_by_type: SummaryByType[];
   detailed_records: DetailedRecord[];
+  pagination?: PaginationBlock;
+  // Flat fallbacks
+  current_page?: number;
+  last_page?: number;
+  per_page?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Status options
+// ---------------------------------------------------------------------------
+
+const PTW_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "DRAFT", label: "Draft" },
+  { value: "SUBMITTED", label: "Submitted" },
+  { value: "SDO_RETURNED", label: "SDO Returned" },
+  { value: "SDO_CANCELLED", label: "SDO Cancelled" },
+  { value: "SDO_FORWARDED_TO_XEN", label: "SDO Forwarded to XEN" },
+  { value: "XEN_RETURNED_TO_SDO", label: "XEN Returned to SDO" },
+  { value: "XEN_REJECTED", label: "XEN Rejected" },
+  { value: "XEN_APPROVED_TO_PDC", label: "XEN Approved to PDC" },
+  { value: "PDC_DELEGATED_TO_GRID", label: "PDC Delegated to GRID" },
+  { value: "GRID_PRECHECKS_DONE", label: "GRID Prechecks Done" },
+  { value: "PTW_ISSUED", label: "PTW Issued" },
+  { value: "IN_EXECUTION", label: "In Execution" },
+  { value: "COMPLETION_SUBMITTED", label: "Completion Submitted" },
+  { value: "GRID_RESTORED_AND_CLOSED", label: "Grid Restored and Closed" },
+  { value: "CANCELLATION_REQUESTED_BY_LS", label: "Cancellation Requested by LS" },
+  { value: "GRID_CANCELLATION_CONFIRMED_AND_CLOSED", label: "Grid Cancellation Confirmed & Closed" },
+  { value: "LS_RESUBMIT_TO_XEN", label: "LS Resubmit to XEN" },
+  { value: "XEN_RETURNED_TO_LS", label: "XEN Returned to LS" },
+  { value: "PDC_RETURNED_TO_LS", label: "PDC Returned to LS" },
+  { value: "LS_RESUBMIT_TO_PDC", label: "LS Resubmit to PDC" },
+  { value: "PDC_REJECTED", label: "PDC Rejected" },
+  { value: "CANCELLATION_APPROVED_BY_SDO", label: "Cancellation Approved by SDO" },
+  { value: "PDC_CONFIRMED", label: "PDC Confirmed" },
+  { value: "PENDING_PDC_CONFIRMATION", label: "Pending PDC Confirmation" },
+  { value: "GRID_RESOLVE_REQUIRED", label: "Grid Resolve Required" },
+  { value: "RE_SUBMITTED_TO_PDC", label: "Re-submitted to PDC" },
+  { value: "NO_PTW_APPROVED_BY_SDO", label: "No PTW Approved by SDO" },
+];
+
+// ---------------------------------------------------------------------------
+// Labelling helpers
+// ---------------------------------------------------------------------------
+
+function getStatusLabels(codes: string[] | undefined): string {
+  if (!codes || codes.length === 0) return "All Statuses";
+  return codes
+    .map((code) => PTW_STATUS_OPTIONS.find((s) => s.value === code)?.label ?? code)
+    .join(", ");
+}
+
+function getTypeLabels(codes: string[] | undefined): string {
+  if (!codes || codes.length === 0) return "All Types";
+  return codes.join(", ");
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select dropdown
+// ---------------------------------------------------------------------------
+
+const MultiSelectDropdown: React.FC<{
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}> = ({ label, options, selected, onChange, placeholder = "All", disabled }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const toggle = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  const clearAll = () => onChange([]);
+
+  const displayLabel =
+    selected.length === 0
+      ? placeholder
+      : selected.length === 1
+        ? options.find((o) => o.value === selected[0])?.label ?? selected[0]
+        : `${selected.length} selected`;
+
+  return (
+    <div ref={rootRef} className="relative w-full">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 transition-colors hover:border-slate-300 focus:border-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+      >
+        <span className="truncate text-left">{displayLabel}</span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-700">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {label}
+            </span>
+            {selected.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-[10px] font-semibold text-blue-600 hover:underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {options.map((opt) => {
+            const isSelected = selected.includes(opt.value);
+            return (
+              <label
+                key={opt.value}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggle(opt.value)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span
+                  className={
+                    isSelected
+                      ? "font-semibold text-slate-800 dark:text-slate-100"
+                      : "text-slate-600 dark:text-slate-300"
+                  }
+                >
+                  {opt.label}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function formatDateTime(iso: string): string {
-  // The API already returns formatted date-time, so this may not be needed.
-  // But keep it in case we receive ISO in future.
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }
 
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 const Main = () => {
-  // Report data and loading state
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  // Hierarchy data
-  const [regions, setRegions] = useState<OptionItem[]>([]);
+  // Hierarchy
   const [circles, setCircles] = useState<OptionItem[]>([]);
   const [divisions, setDivisions] = useState<OptionItem[]>([]);
   const [subDivisions, setSubDivisions] = useState<OptionItem[]>([]);
-  const [isRegionsLoading, setIsRegionsLoading] = useState(false);
   const [isCirclesLoading, setIsCirclesLoading] = useState(false);
   const [isDivisionsLoading, setIsDivisionsLoading] = useState(false);
   const [isSubDivisionsLoading, setIsSubDivisionsLoading] = useState(false);
 
-  // PTW types (hardcoded for now; could fetch from API if needed)
+  // PTW types
   const ptwTypes: PTWType[] = [
     { code: "Planned", label_en: "Planned" },
     { code: "Emergency", label_en: "Emergency" },
     { code: "Misc", label_en: "Misc" },
   ];
 
-  // Filter state
+  // Filters
   const [filters, setFilters] = useState({
-    region_id: 0,
     circle_id: 0,
     division_id: 0,
     sub_division_id: 0,
     ptw_types: [] as string[],
+    statuses: [] as string[],
     from_date: "2026-01-01",
     to_date: "2026-02-04",
   });
 
-  // Derived selected IDs for hierarchy fetches
-  const selectedRegionId = filters.region_id > 0 ? filters.region_id : null;
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState<number>(50);
+  const PER_PAGE_OPTIONS = [50, 100, 500, 1000] as const;
+  const [hasGenerated, setHasGenerated] = useState(false);
+
   const selectedCircleId = filters.circle_id > 0 ? filters.circle_id : null;
   const selectedDivisionId = filters.division_id > 0 ? filters.division_id : null;
 
-  // Fetch regions on mount
+  // Fetch circles on mount
   useEffect(() => {
-    const fetchRegions = async () => {
-      setIsRegionsLoading(true);
-      try {
-        const res = await api.get("/api/v1/meta/regions");
-        // Assume response format: { data: [{ id, name }] }
-        const data = res.data?.data ?? res.data;
-        setRegions(
-          Array.isArray(data)
-            ? data.map((r: any) => ({ value: r.id, label: r.name }))
-            : []
-        );
-      } catch (err) {
-        console.error("Failed to load regions", err);
-      } finally {
-        setIsRegionsLoading(false);
-      }
-    };
-    fetchRegions();
-  }, []);
-
-  // Fetch circles when region changes
-  useEffect(() => {
-    if (!selectedRegionId) {
-      setCircles([]);
-      return;
-    }
     const fetchCircles = async () => {
       setIsCirclesLoading(true);
       try {
-        const res = await api.get(`/api/v1/meta/circles?region_id=${selectedRegionId}`);
+        const res = await api.get("/api/v1/meta/circles");
         const data = res.data?.data ?? res.data;
         setCircles(
-          Array.isArray(data)
-            ? data.map((c: any) => ({ value: c.id, label: c.name }))
-            : []
+          Array.isArray(data) ? data.map((c: any) => ({ value: c.id, label: c.name })) : []
         );
       } catch (err) {
         console.error("Failed to load circles", err);
@@ -156,9 +314,9 @@ const Main = () => {
       }
     };
     fetchCircles();
-  }, [selectedRegionId]);
+  }, []);
 
-  // Fetch divisions when circle changes
+  // Fetch divisions
   useEffect(() => {
     if (!selectedCircleId) {
       setDivisions([]);
@@ -170,9 +328,7 @@ const Main = () => {
         const res = await api.get(`/api/v1/meta/divisions?circle_id=${selectedCircleId}`);
         const data = res.data?.data ?? res.data;
         setDivisions(
-          Array.isArray(data)
-            ? data.map((d: any) => ({ value: d.id, label: d.name }))
-            : []
+          Array.isArray(data) ? data.map((d: any) => ({ value: d.id, label: d.name })) : []
         );
       } catch (err) {
         console.error("Failed to load divisions", err);
@@ -183,7 +339,7 @@ const Main = () => {
     fetchDivisions();
   }, [selectedCircleId]);
 
-  // Fetch sub-divisions when division changes
+  // Fetch sub-divisions
   useEffect(() => {
     if (!selectedDivisionId) {
       setSubDivisions([]);
@@ -195,9 +351,7 @@ const Main = () => {
         const res = await api.get(`/api/v1/meta/sub-divisions?division_id=${selectedDivisionId}`);
         const data = res.data?.data ?? res.data;
         setSubDivisions(
-          Array.isArray(data)
-            ? data.map((sd: any) => ({ value: sd.id, label: sd.name }))
-            : []
+          Array.isArray(data) ? data.map((sd: any) => ({ value: sd.id, label: sd.name })) : []
         );
       } catch (err) {
         console.error("Failed to load sub-divisions", err);
@@ -217,16 +371,7 @@ const Main = () => {
   const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
-    if (name === "region_id") {
-      const regionId = value === "0" ? 0 : parseInt(value);
-      setFilters((prev) => ({
-        ...prev,
-        region_id: regionId,
-        circle_id: 0,
-        division_id: 0,
-        sub_division_id: 0,
-      }));
-    } else if (name === "circle_id") {
+    if (name === "circle_id") {
       const circleId = value === "0" ? 0 : parseInt(value);
       setFilters((prev) => ({
         ...prev,
@@ -234,6 +379,7 @@ const Main = () => {
         division_id: 0,
         sub_division_id: 0,
       }));
+      setPage(1);
     } else if (name === "division_id") {
       const divisionId = value === "0" ? 0 : parseInt(value);
       setFilters((prev) => ({
@@ -241,11 +387,14 @@ const Main = () => {
         division_id: divisionId,
         sub_division_id: 0,
       }));
+      setPage(1);
     } else if (name === "sub_division_id") {
       const subDivisionId = value === "0" ? 0 : parseInt(value);
       setFilters((prev) => ({ ...prev, sub_division_id: subDivisionId }));
+      setPage(1);
     } else {
       setFilters((prev) => ({ ...prev, [name]: value }));
+      if (name === "from_date" || name === "to_date") setPage(1);
     }
   };
 
@@ -259,38 +408,86 @@ const Main = () => {
           : [...prev.ptw_types, code],
       };
     });
+    setPage(1);
   };
 
- const onGenerate = async () => {
-  if (!canGenerate) return;
-  setIsReportLoading(true);
-  setReportData(null);
-  try {
+  const onStatusesChange = (next: string[]) => {
+    setFilters((prev) => ({ ...prev, statuses: next }));
+    setPage(1);
+  };
+
+  // -------- Query params --------
+  const buildParams = (opts?: { pageOverride?: number; perPageOverride?: number }) => {
     const params: any = {
       from: filters.from_date,
       to: filters.to_date,
+      per_page: opts?.perPageOverride ?? perPage,
+      page: opts?.pageOverride ?? page,
     };
-    if (filters.region_id > 0) params.region_id = filters.region_id;
     if (filters.circle_id > 0) params.circle_id = filters.circle_id;
     if (filters.division_id > 0) params.division_id = filters.division_id;
     if (filters.sub_division_id > 0) params.sub_division_id = filters.sub_division_id;
-    // ✅ Send types as an array if any are selected
-    if (filters.ptw_types.length > 0) {
-      params.types = filters.ptw_types;
-    }
+    if (filters.ptw_types.length > 0) params.types = filters.ptw_types;
+    if (filters.statuses.length > 0) params.statuses = filters.statuses;
+    return params;
+  };
 
-    const response = await api.get("/api/v1/meta/reports/ptw-type-wise", { params });
-    const data = response.data?.data ?? response.data;
-    setReportData(data);
-  } catch (err) {
-    console.error("Failed to generate report", err);
-    alert("Failed to generate report. Please check your filters and try again.");
-  } finally {
-    setIsReportLoading(false);
-  }
-};
+  const fetchReport = async (opts?: { pageOverride?: number; perPageOverride?: number }) => {
+    setIsReportLoading(true);
+    try {
+      const params = buildParams(opts);
+      const response = await api.get("/api/v1/meta/reports/ptw-type-wise", {
+        params,
+        // ✅ Produces types[]=Planned&types[]=Emergency (Laravel-friendly)
+        paramsSerializer: { indexes: false },
+      });
+      const apiData = response.data?.data ?? response.data;
+
+      const pag: PaginationBlock | undefined = apiData.pagination;
+
+      const merged: ReportData = {
+        ...apiData,
+        total_ptws: pag?.total ?? apiData.total_ptws ?? apiData.detailed_records?.length ?? 0,
+        current_page: pag?.current_page ?? apiData.current_page ?? opts?.pageOverride ?? page,
+        last_page: pag?.last_page ?? apiData.last_page ?? 1,
+        per_page: pag?.per_page ?? apiData.per_page ?? opts?.perPageOverride ?? perPage,
+      };
+
+      setReportData(merged);
+      setHasGenerated(true);
+    } catch (err: any) {
+      console.error("Failed to generate report", err);
+      toast.error(
+        err?.response?.data?.message ||
+          "Failed to generate report. Please check your filters and try again."
+      );
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
+  const onGenerate = async () => {
+    if (!canGenerate) return;
+    setPage(1);
+    await fetchReport({ pageOverride: 1 });
+  };
+
+  const handlePageChange = async (nextPage: number) => {
+    if (nextPage < 1) return;
+    const lastPage = reportData?.last_page ?? 1;
+    if (nextPage > lastPage) return;
+    setPage(nextPage);
+    await fetchReport({ pageOverride: nextPage });
+  };
+
+  const handlePerPageChange = async (nextPerPage: number) => {
+    setPerPage(nextPerPage);
+    setPage(1);
+    await fetchReport({ perPageOverride: nextPerPage, pageOverride: 1 });
+  };
+
   // ---------------------------------------------------------------------
-  // PDF export (adapted to new data shape)
+  // PDF export
   // ---------------------------------------------------------------------
 
   const loadPngAsResizedDataURL = async (url: string, targetMaxWidthPx = 220): Promise<string> => {
@@ -321,7 +518,7 @@ const Main = () => {
 
   const handleDownloadPDF = async () => {
     if (!reportData) {
-      alert("No report data available to download.");
+      toast.error("No report data available to download.");
       return;
     }
     setIsGeneratingPDF(true);
@@ -353,43 +550,67 @@ const Main = () => {
       const leftX = hasLogo ? logoX + logoW + logoGap : 10;
       const usableWidth = pageWidth - leftX - 10;
 
-      // Title
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(14);
-      pdf.text(reportData.title || "PTW Type-wise Report", pageWidth / 2, headerTop + 2, { align: "center" });
+      pdf.text(reportData.title || "PTW Type-wise Report", pageWidth / 2, headerTop + 2, {
+        align: "center",
+      });
 
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
-      pdf.text(`Generated: ${reportData.generated_at || new Date().toLocaleString()}`, pageWidth / 2, headerTop + 7, { align: "center" });
+      pdf.text(
+        `Generated: ${reportData.generated_at || new Date().toLocaleString()}`,
+        pageWidth / 2,
+        headerTop + 7,
+        { align: "center" }
+      );
 
+      const cp = reportData.current_page ?? 1;
+      const lp = reportData.last_page ?? 1;
       pdf.setFontSize(9);
       pdf.text(
-        `Total PTWs: ${reportData.total_ptws}   |   Date Range: ${reportData.applied_filters.from} to ${reportData.applied_filters.to}`,
+        `Page ${cp} of ${lp}   |   Total PTWs: ${reportData.total_ptws}   |   Date Range: ${reportData.applied_filters.from} to ${reportData.applied_filters.to}`,
         pageWidth / 2,
         headerTop + 13,
         { align: "center" }
       );
 
-      // Applied filters
-      const filterLines: string[] = [];
       const af = reportData.applied_filters;
-      if (af.region_id) filterLines.push(`Region ID: ${af.region_id}`);
+      const statusLabels =
+        af.statuses && af.statuses.length > 0
+          ? af.statuses
+              .map(
+                (code) =>
+                  PTW_STATUS_OPTIONS.find((s) => s.value === code)?.label ?? code
+              )
+              .join(", ")
+          : "All Statuses";
+
+      // Prominent "Counting statuses" line
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`Counting statuses: ${statusLabels}`, pageWidth / 2, headerTop + 18, {
+        align: "center",
+      });
+
+      // Applied filters block
+      const filterLines: string[] = [];
+      if (af.types && af.types.length) filterLines.push(`PTW Types: ${af.types.join(", ")}`);
       if (af.circle_id) filterLines.push(`Circle ID: ${af.circle_id}`);
       if (af.division_id) filterLines.push(`Division ID: ${af.division_id}`);
       if (af.sub_division_id) filterLines.push(`Sub Division ID: ${af.sub_division_id}`);
-      if (af.types && af.types.length) filterLines.push(`PTW Types: ${af.types.join(", ")}`);
       filterLines.push(`From: ${af.from}`);
       filterLines.push(`To: ${af.to}`);
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(9);
-      pdf.text("Applied Filters:", leftX, headerTop + 18);
+      pdf.text("Applied Filters:", leftX, headerTop + 24);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
       const filtersText = filterLines.join("   |   ");
       const wrapped = pdf.splitTextToSize(filtersText, usableWidth);
-      pdf.text(wrapped, leftX, headerTop + 22);
-      let cursorY = headerTop + 26 + wrapped.length * 4 + 6;
+      pdf.text(wrapped, leftX, headerTop + 28);
+      let cursorY = headerTop + 32 + wrapped.length * 4 + 6;
 
       // Summary table
       pdf.setFont("helvetica", "bold");
@@ -425,13 +646,24 @@ const Main = () => {
       // @ts-ignore
       cursorY = (pdf as any).lastAutoTable.finalY + 10;
 
-      // Detailed records table
+      // Detailed records
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(10);
       pdf.text("Detailed Records", leftX, cursorY);
       cursorY += 4;
 
-      const head = [["Sr. No.", "PTW Reference", "Type", "Circle", "Division", "Sub-Division", "Feeder", "Issued At", "Duration", "Status"]];
+      const head = [[
+        "Sr. No.",
+        "PTW Reference",
+        "Type",
+        "Circle",
+        "Division",
+        "Sub-Division",
+        "Feeder",
+        "Issued At",
+        "Duration",
+        "Status",
+      ]];
       const body = reportData.detailed_records.map((item) => [
         item.sr_no,
         item.ptw_reference ?? "—",
@@ -463,12 +695,12 @@ const Main = () => {
         columnStyles: {
           0: { cellWidth: 12 },
           1: { cellWidth: 30, halign: "left" },
-          2: { cellWidth: 30, halign: "left" },
-          3: { cellWidth: 30, halign: "left" },
-          4: { cellWidth: 30, halign: "left" },
-          5: { cellWidth: 30, halign: "left" },
-          6: { cellWidth: 30, halign: "left" },
-          7: { cellWidth: 32 },
+          2: { cellWidth: 22, halign: "left" },
+          3: { cellWidth: 26, halign: "left" },
+          4: { cellWidth: 26, halign: "left" },
+          5: { cellWidth: 26, halign: "left" },
+          6: { cellWidth: 26, halign: "left" },
+          7: { cellWidth: 30 },
           8: { cellWidth: 16 },
           9: { cellWidth: "auto" },
         },
@@ -478,15 +710,37 @@ const Main = () => {
       });
 
       const safe = (s: string) => s.replace(/[\/\\:*?"<>|]/g, "-").trim();
-      const filename = `PTW-Type-Report-${safe(af.from)}-to-${safe(af.to)}.pdf`;
+      const filename = `PTW-Type-Report-${safe(af.from)}-to-${safe(af.to)}-p${cp}.pdf`;
       pdf.save(filename);
     } catch (err) {
       console.error(err);
-      alert("Failed to generate PDF. Please try again.");
+      toast.error("Failed to generate PDF. Please try again.");
     } finally {
       setIsGeneratingPDF(false);
     }
   };
+
+  // -------- Pagination helpers --------
+  const currentPage = reportData?.current_page ?? 1;
+  const lastPage = reportData?.last_page ?? 1;
+  const totalEntries = reportData?.total_ptws ?? 0;
+  const effectivePerPage = reportData?.per_page ?? perPage;
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | "…")[] = [];
+    if (lastPage <= 7) {
+      for (let i = 1; i <= lastPage; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("…");
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(lastPage - 1, currentPage + 1); i++) {
+        pages.push(i);
+      }
+      if (currentPage < lastPage - 2) pages.push("…");
+      pages.push(lastPage);
+    }
+    return pages;
+  }, [currentPage, lastPage]);
 
   return (
     <div className="p-5">
@@ -516,7 +770,12 @@ const Main = () => {
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Download PDF
                 </>
@@ -550,27 +809,6 @@ const Main = () => {
         </div>
 
         <div className="grid grid-cols-12 gap-4">
-          {/* Region */}
-          <div className="col-span-12 md:col-span-3">
-            <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
-              Region
-            </label>
-            <select
-              className="w-full bg-white dark:bg-slate-800 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 transition-colors"
-              name="region_id"
-              value={filters.region_id}
-              onChange={onChange}
-              disabled={isRegionsLoading}
-            >
-              <option value="0">All Regions</option>
-              {regions.map((region) => (
-                <option key={region.value} value={region.value}>
-                  {region.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Circle */}
           <div className="col-span-12 md:col-span-3">
             <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
@@ -581,7 +819,7 @@ const Main = () => {
               name="circle_id"
               value={filters.circle_id}
               onChange={onChange}
-              disabled={!filters.region_id || isCirclesLoading}
+              disabled={isCirclesLoading}
             >
               <option value="0">All Circles</option>
               {circles.map((circle) => (
@@ -634,6 +872,20 @@ const Main = () => {
             </select>
           </div>
 
+          {/* Status */}
+          <div className="col-span-12 md:col-span-3">
+            <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
+              Status
+            </label>
+            <MultiSelectDropdown
+              label="Status"
+              options={PTW_STATUS_OPTIONS}
+              selected={filters.statuses}
+              onChange={onStatusesChange}
+              placeholder="All Statuses"
+            />
+          </div>
+
           {/* From Date */}
           <div className="col-span-12 md:col-span-3">
             <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
@@ -662,20 +914,39 @@ const Main = () => {
             />
           </div>
 
+          {/* Per Page */}
+          <div className="col-span-12 md:col-span-3">
+            <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
+              Rows per page
+            </label>
+            <select
+              className="w-full bg-white dark:bg-slate-800 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:border-slate-400 dark:focus:border-slate-500 transition-colors"
+              value={perPage}
+              onChange={(e) => handlePerPageChange(Number(e.target.value))}
+            >
+              {PER_PAGE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Reset */}
           <div className="col-span-12 md:col-span-3 flex items-end">
             <button
               type="button"
               onClick={() => {
                 setFilters({
-                  region_id: 0,
                   circle_id: 0,
                   division_id: 0,
                   sub_division_id: 0,
                   ptw_types: [],
+                  statuses: [],
                   from_date: "",
                   to_date: "",
                 });
+                setPage(1);
               }}
               className="w-full h-11 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
             >
@@ -683,7 +954,7 @@ const Main = () => {
             </button>
           </div>
 
-          {/* PTW Type multi-select (chips) */}
+          {/* PTW Type chips */}
           <div className="col-span-12">
             <label className="block mb-2 text-xs font-semibold tracking-wide text-slate-700 dark:text-slate-300 uppercase">
               PTW Type
@@ -714,13 +985,45 @@ const Main = () => {
         </div>
       </div>
 
-      {/* Summary Statistics */}
+      {/* Summary */}
       {reportData && (
         <div className="mt-5">
           <div className="box p-5">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-              <div className="font-medium">Summary by PTW Type</div>
-              <div className="text-slate-500 text-xs">Total: {reportData.total_ptws}</div>
+            {/* Header + Counting banner */}
+            <div className="border-b border-slate-200 pb-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div className="font-medium">Summary by PTW Type</div>
+                <div className="text-slate-500 text-xs">
+                  Total: {reportData.total_ptws.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Counting line */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                <span className="font-semibold uppercase tracking-wider text-slate-400">
+                  Counting:
+                </span>
+                <span>
+                  <span className="text-slate-500">Types </span>
+                  <span className="font-semibold text-slate-700">
+                    {getTypeLabels(reportData.applied_filters.types)}
+                  </span>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>
+                  <span className="text-slate-500">Statuses </span>
+                  <span className="font-semibold text-slate-700">
+                    {getStatusLabels(reportData.applied_filters.statuses)}
+                  </span>
+                </span>
+                <span className="text-slate-300">•</span>
+                <span>
+                  <span className="text-slate-500">Period </span>
+                  <span className="font-semibold text-slate-700">
+                    {reportData.applied_filters.from} → {reportData.applied_filters.to}
+                  </span>
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-12 gap-4 mb-5">
@@ -757,7 +1060,9 @@ const Main = () => {
               <tfoot>
                 <tr className="bg-slate-50 border-t border-slate-200">
                   <td className="px-4 py-2 font-semibold">TOTAL</td>
-                  <td className="px-4 py-2 text-center font-bold">{reportData.total_ptws}</td>
+                  <td className="px-4 py-2 text-center font-bold">
+                    {reportData.total_ptws.toLocaleString()}
+                  </td>
                   <td className="px-4 py-2 text-center font-semibold">100%</td>
                 </tr>
               </tfoot>
@@ -771,11 +1076,35 @@ const Main = () => {
         <div className="grid grid-cols-12 gap-5 mt-5">
           <div className="col-span-12" ref={reportRef}>
             <div className="box p-5">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-                <div className="font-medium">Detailed Records</div>
-                <div className="text-slate-500 text-xs">
-                  {reportData.detailed_records.length} entries
+              <div className="border-b border-slate-200 pb-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">Detailed Records</div>
+                  <div className="text-slate-500 text-xs">
+                    Page {currentPage} of {lastPage} · {totalEntries.toLocaleString()} entries
+                  </div>
                 </div>
+
+                {reportData.applied_filters.statuses &&
+                  reportData.applied_filters.statuses.length > 1 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Filtered by:
+                      </span>
+                      {reportData.applied_filters.statuses.map((code) => {
+                        const label =
+                          PTW_STATUS_OPTIONS.find((s) => s.value === code)?.label ??
+                          code;
+                        return (
+                          <span
+                            key={code}
+                            className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
               </div>
 
               {reportData.detailed_records.length > 0 ? (
@@ -802,7 +1131,9 @@ const Main = () => {
                           className="border-b border-slate-100 hover:bg-slate-50"
                         >
                           <td className="px-3 py-3 text-center whitespace-nowrap">{item.sr_no}</td>
-                          <td className="px-3 py-3 whitespace-nowrap font-medium">{item.ptw_reference ?? "—"}</td>
+                          <td className="px-3 py-3 whitespace-nowrap font-medium">
+                            {item.ptw_reference ?? "—"}
+                          </td>
                           <td className="px-3 py-3 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs">
                               {item.type}
@@ -823,6 +1154,107 @@ const Main = () => {
               ) : (
                 <div className="alert alert-secondary-soft show mt-5">
                   No data found for the selected filters.
+                </div>
+              )}
+
+              {totalEntries > 0 && (
+                <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-slate-500">
+                    Showing{" "}
+                    <span className="font-semibold text-slate-700">
+                      {Math.min((currentPage - 1) * effectivePerPage + 1, totalEntries)}–
+                      {Math.min(currentPage * effectivePerPage, totalEntries)}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-slate-700">
+                      {totalEntries.toLocaleString()}
+                    </span>{" "}
+                    entries
+                    {lastPage > 1 && (
+                      <>
+                        {" · "}
+                        Page <span className="font-semibold text-slate-700">{currentPage}</span> of{" "}
+                        <span className="font-semibold text-slate-700">{lastPage}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {lastPage > 1 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={currentPage <= 1 || isReportLoading}
+                        onClick={() => handlePageChange(1)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="First page"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={currentPage <= 1 || isReportLoading}
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Previous page"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+
+                      {pageNumbers.map((p, i) =>
+                        p === "…" ? (
+                          <span
+                            key={`dots-${i}`}
+                            className="flex h-8 w-8 items-center justify-center text-xs text-slate-400"
+                          >
+                            ···
+                          </span>
+                        ) : (
+                          <button
+                            key={p}
+                            type="button"
+                            disabled={isReportLoading}
+                            onClick={() => handlePageChange(p as number)}
+                            className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-semibold tabular-nums transition ${
+                              p === currentPage
+                                ? "bg-[#0B69DC] text-white shadow"
+                                : "text-slate-600 hover:bg-slate-100"
+                            } disabled:cursor-not-allowed`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={currentPage >= lastPage || isReportLoading}
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Next page"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={currentPage >= lastPage || isReportLoading}
+                        onClick={() => handlePageChange(lastPage)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Last page"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

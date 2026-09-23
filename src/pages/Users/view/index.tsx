@@ -7,12 +7,16 @@ import Lucide from "@/components/Base/Lucide";
 import Button from "@/components/Base/Button";
 import { useState } from "react";
 import { CreatePostingModal } from "./dailog";
+import ResetPasswordModal from "./ResetPasswordModal"; // ← NEW
 
 export default function ViewUser() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const userId = Number(id);
+
+  // Reset-password modal state
+  const [resetOpen, setResetOpen] = useState(false);
 
   // If ID is missing or NaN
   if (!userId || isNaN(userId)) {
@@ -34,7 +38,7 @@ export default function ViewUser() {
       </div>
     );
   }
-  console.log(data);
+
   // Error handling
   if (isError || !data) {
     return (
@@ -55,6 +59,15 @@ export default function ViewUser() {
           User Profile
         </h1>
         <div className="flex gap-2 items-center justify-center">
+          {/* ← NEW: Reset Password button */}
+          <Button
+            variant="outline-secondary"
+            onClick={() => setResetOpen(true)}
+          >
+            <Lucide icon="KeyRound" className="w-4 h-4 mr-2" />
+            Reset Password
+          </Button>
+
           <Button
             variant="primary"
             onClick={() => navigate(`/users/${userId}/edit`)}
@@ -130,14 +143,23 @@ export default function ViewUser() {
           <Info label="Updated At" value={formatDT(user.updated_at)} />
           <Info label="Last Login" value={formatDT(user.last_login_at)} />
         </Section>
+
         {/* ---------------- Posting History ---------------- */}
         <PostingHistory userId={userId} roleName={user.roles?.[0]?.name} />
       </div>
+
+      {/* ← NEW: Reset Password modal */}
+      <ResetPasswordModal
+        open={resetOpen}
+        userId={userId}
+        userName={user.name}
+        onClose={() => setResetOpen(false)}
+      />
     </div>
   );
 }
 
-/* ---------- Child Components ---------- */
+/* ---------- Child Components (unchanged) ---------- */
 function Info({ label, value }: { label: string; value: any }) {
   return (
     <div className="flex justify-between border-b pb-1">
@@ -159,7 +181,6 @@ function Section({
   return (
     <div>
       <h3 className="text-lg font-semibold text-slate-700 mb-4 flex items-center gap-2">
-        {/* <Lucide icon={icon} className="w-5 h-5 text-primary" /> */}
         {title}
       </h3>
       <div className="space-y-3 text-sm">{children}</div>
@@ -181,9 +202,20 @@ function formatDT(date?: string | null) {
   });
 }
 
-
-function PostingHistory({ userId, roleName }: { userId: number; roleName: string }) {
-  const { data: history, isLoading, isError, refetch } = usePostingHistory(userId);
+/* ---------- Posting History (unchanged) ---------- */
+function PostingHistory({
+  userId,
+  roleName,
+}: {
+  userId: number;
+  roleName: string;
+}) {
+  const {
+    data: history,
+    isLoading,
+    isError,
+    refetch,
+  } = usePostingHistory(userId);
   const [createOpen, setCreateOpen] = useState(false);
 
   if (isLoading)
@@ -203,8 +235,6 @@ function PostingHistory({ userId, roleName }: { userId: number; roleName: string
 
   return (
     <div className="bg-white mt-10 p-8 rounded-2xl border shadow space-y-6">
-
-      {/* ------------ HEADER ------------ */}
       <h2 className="text-xl font-bold text-slate-800 flex justify-between items-center gap-2">
         <div className="flex gap-3 items-center">
           <Lucide icon="History" className="w-5 h-5 text-primary" />
@@ -220,38 +250,35 @@ function PostingHistory({ userId, roleName }: { userId: number; roleName: string
         </Button>
       </h2>
 
-      {/* ---------- CREATE MODAL ---------- */}
-     <CreatePostingModal
-  open={createOpen}
-  userId={userId}
-  roleName={roleName ?? ""}
-  onClose={() => setCreateOpen(false)}
-  onCreated={() => {
-    setCreateOpen(false);
-    refetch();
-  }}
-/>
+      <CreatePostingModal
+        open={createOpen}
+        userId={userId}
+        roleName={roleName ?? ""}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => {
+          setCreateOpen(false);
+          refetch();
+        }}
+      />
 
-      {/* ---------- EMPTY STATE ---------- */}
       {(!history || history.length === 0) && (
         <div className="p-6 rounded-xl border bg-slate-50 text-center text-slate-500">
           No posting history found.
         </div>
       )}
 
-      {/* ---------- TIMELINE LIST ---------- */}
       <div className="relative border-l border-slate-300 pl-6 space-y-8">
         {history?.map((h: any) => (
           <div key={h.id} className="relative">
-            {/* timeline dot */}
             <div className="absolute -left-8 top-1 w-4 h-4 rounded-full border-4 border-white bg-primary shadow" />
 
             <div className="rounded-xl border border-slate-200 shadow-sm bg-gradient-to-br from-white to-slate-50 p-5">
-
-              {/* DATE */}
               <div className="flex justify-between items-center">
                 <p className="text-sm text-slate-600">
-                  <Lucide icon="Calendar" className="inline w-4 h-4 mr-1 text-primary" />
+                  <Lucide
+                    icon="Calendar"
+                    className="inline w-4 h-4 mr-1 text-primary"
+                  />
                   {formatDT(h.changed_on)}
                 </p>
                 <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">
@@ -259,12 +286,10 @@ function PostingHistory({ userId, roleName }: { userId: number; roleName: string
                 </span>
               </div>
 
-              {/* EFFECTIVE DATES */}
               <div className="mt-2 text-xs text-slate-500">
                 Effective: <b>{h.effective_from}</b> → <b>{h.effective_to}</b>
               </div>
 
-              {/* POSTING BLOCK */}
               <div className="p-4 mt-4 border rounded-xl bg-white shadow-inner">
                 <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
                   <Lucide icon="MapPin" className="w-4 h-4 text-primary" />
@@ -273,7 +298,6 @@ function PostingHistory({ userId, roleName }: { userId: number; roleName: string
 
                 <PostingBlock data={h} />
               </div>
-
             </div>
           </div>
         ))}

@@ -50,6 +50,8 @@ import Ptwtypewisereport from "@/pages/Reports/Ptwtypewisereport";
 import Profile from "@/pages/profile";
 import NotificationsPage from "@/pages/notifications";
 import GridSessionsPage from "@/pages/sessions";
+import ActionQueuePage from "@/pages/action-queue/page";
+import RecentActivityPage from "@/pages/recent-activity";
 function Router() {
   const routes = [
       {
@@ -213,6 +215,14 @@ function Router() {
         {
           path: "/ptw",
           element: <PTW_StepperWizard />,
+        },
+        {
+          path: "/action-queue",
+          element: <ActionQueuePage />,
+        },
+        {
+          path: "/recent-activity",
+          element: <RecentActivityPage />,
         },
     
       

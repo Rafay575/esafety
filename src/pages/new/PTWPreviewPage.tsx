@@ -8,9 +8,31 @@ import {
   ArrowLeft,
   Send,
   Clock,
-  Upload,
+    Activity,
   Pencil,
   UserPlus,
+  Download,
+  Loader2,
+   X,
+     CheckCircle2,
+  XCircle,
+  Circle,
+    FileText,
+  Hash,
+  Layers,
+  MapPin,
+  CalendarClock,
+  Clock4,
+  PowerOff,
+  Power,
+  GitBranch,
+  UserCheck,
+  Building2,
+  Zap,
+  ShieldCheck,
+  Users,
+  ClipboardList,
+ 
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/axios";
@@ -293,14 +315,28 @@ const roleColor = (role: string): string => {
 
 const chip = (val: "YES" | "NO" | null): JSX.Element => {
   const base =
-    "px-2 w-20 flex justify-center items-center rounded-full text-xs font-medium border transition-colors";
+    "inline-flex w-[68px] h-6 items-center justify-center gap-1 rounded-full text-[11px] font-semibold border transition-all";
   if (val === "YES")
-    return <span className={`${base} border-green-200 bg-green-50 text-green-700`}>YES</span>;
+    return (
+      <span className={`${base} border-emerald-200 bg-emerald-50 text-emerald-700`}>
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        YES
+      </span>
+    );
   if (val === "NO")
-    return <span className={`${base} border-red-200 bg-red-50 text-red-700`}>NO</span>;
-  return <span className={`${base} border-slate-200 bg-slate-50 text-slate-600`}>Pending</span>;
+    return (
+      <span className={`${base} border-rose-200 bg-rose-50 text-rose-700`}>
+        <XCircle className="w-3.5 h-3.5" />
+        NO
+      </span>
+    );
+  return (
+    <span className={`${base} border-slate-200 bg-slate-50 text-slate-500`}>
+      <Circle className="w-3.5 h-3.5" />
+      Pending
+    </span>
+  );
 };
-
 const getGoogleMapsApiKey = (): string => {
   if (
     typeof import.meta !== "undefined" &&
@@ -385,6 +421,9 @@ export default function PTWPreviewPage(): JSX.Element {
   const [delegateReason, setDelegateReason] = useState("");
   const [delegateSubmitting, setDelegateSubmitting] = useState(false);
 
+  // ── PDF print/download state ──────────────────────────────────
+  const [isPdfLoading, setIsPdfLoading] = useState<"print" | "download" | null>(null);
+
   // Google Maps for execution modal
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script-execution",
@@ -411,7 +450,8 @@ export default function PTWPreviewPage(): JSX.Element {
   // In a real app, use Redux instead of localStorage
   const authUser = JSON.parse(localStorage.getItem("auth_user") || "{}");
   const userRoles: string[] = authUser?.roles ?? [];
-
+  const [evidenceViewerUrl, setEvidenceViewerUrl] = useState<string | null>(null);
+    const [evidenceTab, setEvidenceTab] = useState<string | null>(null);
   // ---------- Fetch Data ----------
   useEffect(() => {
     if (!id) return;
@@ -439,6 +479,71 @@ export default function PTWPreviewPage(): JSX.Element {
     };
     fetchData();
   }, [id]);
+
+  // ---------- Esafety PDF: Print / Download via API ----------
+    // ---------- Esafety PDF: Print / Download via API ----------
+  const openEsafetyPdf = async (mode: "print" | "download") => {
+    if (!id || isPdfLoading) return;
+
+    // 🔑 Open the popup synchronously (inside the click handler) so the
+    //    browser's popup blocker allows it. We'll fill it once the blob arrives.
+    let printWindow: Window | null = null;
+    if (mode === "print") {
+      printWindow = window.open("", "_blank");
+      if (printWindow) {
+        // Minimal placeholder so the tab isn't blank white while loading
+        printWindow.document.write(
+          `<html><head><title>Loading PDF…</title></head>
+           <body style="margin:0;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;color:#64748b;">
+             Loading PDF…
+           </body></html>`,
+        );
+      } else {
+        toast.error("Please allow pop-ups to view the PDF.");
+        return;
+      }
+    }
+
+    setIsPdfLoading(mode);
+    try {
+      const endpoint =
+        mode === "download"
+          ? `/api/v1/ptw/${id}/esafety-pdf?download=1`
+          : `/api/v1/ptw/${id}/esafety-pdf`;
+
+      const res = await api.get(endpoint, { responseType: "blob" });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(blob);
+
+      if (mode === "download") {
+        const fileName = `PTW_${data?.ptw?.ptw_code || id}.pdf`;
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+        toast.success("PDF downloaded successfully");
+      } else if (printWindow) {
+        // Navigate the already-opened tab to the blob URL
+        printWindow.location.href = blobUrl;
+        // Revoke later (after the user likely finished viewing/printing)
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      }
+    } catch (error) {
+      // Close the placeholder tab if the request failed
+      if (printWindow && !printWindow.closed) {
+        printWindow.close();
+      }
+      toast.error(
+        (error as any)?.response?.data?.message || "Failed to load PDF. Please try again."
+      );
+    } finally {
+      setIsPdfLoading(null);
+    }
+  };
 
   // ---------- Submit Handler for simple notes actions ----------
   const handleSubmitNotes = async (url: string, successMsg: string) => {
@@ -1146,24 +1251,77 @@ export default function PTWPreviewPage(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       {/* HEADER */}
-      <div className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur-md shadow-sm">
-        <div className="mx-auto max-w-6xl flex justify-between items-center px-6 py-4">
-          <div className="flex items-center gap-3">
-            <Button variant="outline-secondary" size="sm" onClick={() => navigate(-1)}>
+          {/* HEADER */}
+      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/85 backdrop-blur-md shadow-sm">
+        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 px-6 py-3.5">
+          {/* LEFT: Back + Title */}
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="shrink-0"
+            >
               <ArrowLeft className="w-4 h-4 mr-2" /> Back
             </Button>
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">Permit to Work (PTW) Preview</h1>
-              <p className="text-xs text-slate-500" dir="rtl">ورک پرمٹ کا خلاصہ</p>
+
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="hidden sm:flex shrink-0 h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 items-center justify-center shadow-sm">
+                <ShieldCheck className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg md:text-xl font-bold text-slate-800 leading-tight truncate">
+                  Permit to Work (PTW) Preview
+                </h1>
+                <p className="text-xs text-slate-500 truncate" dir="rtl">
+                  ورک پرمٹ کا خلاصہ
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusConfig.badgeClass}`}>
+
+          {/* RIGHT: Status + Actions */}
+          <div className="flex flex-wrap items-center gap-2 lg:gap-3">
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold border border-slate-200 shadow-sm ${statusConfig.badgeClass}`}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
               {statusConfig.label}
             </span>
-            <Button variant="outline-secondary" onClick={() => window.print()}>
-              <Printer className="w-4 h-4 mr-2" /> Print
-            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline-secondary"
+                onClick={() => openEsafetyPdf("print")}
+                disabled={isPdfLoading !== null}
+              >
+                {isPdfLoading === "print" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading…
+                  </>
+                ) : (
+                  <>
+                    <Printer className="w-4 h-4 mr-2" /> Print
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="primary"
+                onClick={() => openEsafetyPdf("download")}
+                disabled={isPdfLoading !== null}
+              >
+                {isPdfLoading === "download" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Downloading…
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" /> Download
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1171,93 +1329,414 @@ export default function PTWPreviewPage(): JSX.Element {
       {/* BODY */}
       <div className="mx-auto max-w-6xl px-6 py-8 space-y-8">
         {/* SUMMARY */}
-        <motion.div className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-base font-semibold mb-4 border-b pb-2">Summary / خلاصہ</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm leading-relaxed">
+               {/* SUMMARY */}
+        <motion.div
+          className="rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-3 px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-white">
+            <div className="h-8 w-1.5 rounded-full bg-blue-500" />
             <div>
-              <p><b>PTW Code:</b> {ptw.ptw_code}</p>
-              <p><b>Work Order:</b> {ptw.work_order_no}</p>
-              <p><b>Type:</b> {ptw.type} ({ptw.misc_type})</p>
-              <p><b>Subdivision:</b> {ptw.sub_division_name}</p>
-              <p><b>Feeder:</b> {ptw.feeder_name}</p>
-              <p><b>Transformer:</b> {ptw.transformer_name}</p>
-              <p><b>PTW Required:</b> {ptw.is_ptw_required ? "Yes" : "No"}</p>
+              <h2 className="text-base font-semibold text-slate-800">
+                Summary <span className="text-slate-400 font-normal">/ خلاصہ</span>
+              </h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Key information about this permit
+              </p>
             </div>
-            <div>
-              <p><b>Scheduled Start:</b> {ptw.scheduled_start_at}</p>
-              <p><b>Duration:</b> {ptw.estimated_duration_min} mins</p>
-              <p><b>Switch Off:</b> {ptw.switch_off_time}</p>
-              <p><b>Restore:</b> {ptw.restore_time}</p>
-              <p><b>Close / Alternate Feeder:</b> {ptw.close_feeder} / {ptw.alternate_feeder}</p>
-              <p><b>Feeder Incharge:</b> {ptw.feeder_incharge_name}</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-x-8 gap-y-1 p-6">
+            {/* Column 1 */}
+            <div className="divide-y divide-slate-100">
+              {[
+                { icon: FileText, label: "PTW Code", value: ptw.ptw_code },
+                { icon: ClipboardList, label: "Work Order", value: ptw.work_order_no },
+                { icon: Layers, label: "Type", value: `${ptw.type}${ptw.misc_type ? ` (${ptw.misc_type})` : ""}` },
+                { icon: Building2, label: "Subdivision", value: ptw.sub_division_name },
+                { icon: Zap, label: "Feeder", value: ptw.feeder_name },
+                { icon: Hash, label: "Transformer", value: ptw.transformer_name },
+              ].map((row) => (
+                <div key={row.label} className="flex items-start gap-3 py-2.5">
+                  <row.icon className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                      {row.label}
+                    </p>
+                    <p className="text-sm text-slate-800 font-medium break-words">
+                      {row.value || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-start gap-3 py-2.5">
+                <ShieldCheck className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                    PTW Required
+                  </p>
+                  <span
+                    className={`inline-flex items-center mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      ptw.is_ptw_required
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {ptw.is_ptw_required ? "Yes" : "No"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2 */}
+            <div className="divide-y divide-slate-100">
+              {[
+                { icon: CalendarClock, label: "Scheduled Start", value: ptw.scheduled_start_at },
+                { icon: Clock4, label: "Duration", value: ptw.estimated_duration_min ? `${ptw.estimated_duration_min} mins` : null },
+                { icon: PowerOff, label: "Switch Off", value: ptw.switch_off_time },
+                { icon: Power, label: "Restore", value: ptw.restore_time },
+              ].map((row) => (
+                <div key={row.label} className="flex items-start gap-3 py-2.5">
+                  <row.icon className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                      {row.label}
+                    </p>
+                    <p className="text-sm text-slate-800 font-medium break-words">
+                      {row.value || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex items-start gap-3 py-2.5">
+                <GitBranch className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                    Close / Alternate Feeder
+                  </p>
+                  <p className="text-sm text-slate-800 font-medium break-words">
+                    {ptw.close_feeder || "—"} <span className="text-slate-300">/</span>{" "}
+                    {ptw.alternate_feeder || "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 py-2.5">
+                <UserCheck className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                    Feeder Incharge
+                  </p>
+                  <p className="text-sm text-slate-800 font-medium break-words">
+                    {ptw.feeder_incharge_name || "—"}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>
 
         {/* WORK DETAILS */}
-        <motion.div className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-base font-semibold mb-4 border-b pb-2">Work Details / کام کی تفصیل</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <p><b>Place of Work:</b> {ptw.place_of_work}</p>
-            <p><b>Scope of Work:</b> {ptw.scope_of_work}</p>
-            <p><b>Safety Arrangements:</b> {ptw.safety_arrangements}</p>
-            <p><b>Location:</b> {ptw.location || "—"}</p>
+        <motion.div
+          className="rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-3 px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-white">
+            <div className="h-8 w-1.5 rounded-full bg-indigo-500" />
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">
+                Work Details <span className="text-slate-400 font-normal">/ کام کی تفصیل</span>
+              </h2>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Scope, safety & location
+              </p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4 p-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-indigo-500" />
+                <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+                  Place of Work
+                </p>
+              </div>
+              <p className="text-sm text-slate-800 leading-relaxed">
+                {ptw.place_of_work || "—"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-4 h-4 text-indigo-500" />
+                <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+                  Location
+                </p>
+              </div>
+              <p className="text-sm text-slate-800 leading-relaxed">
+                {ptw.location || "—"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 md:col-span-2">
+              <div className="flex items-center gap-2 mb-2">
+                <ClipboardList className="w-4 h-4 text-indigo-500" />
+                <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+                  Scope of Work
+                </p>
+              </div>
+              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                {ptw.scope_of_work || "—"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 md:col-span-2">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <p className="text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">
+                  Safety Arrangements
+                </p>
+              </div>
+              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                {ptw.safety_arrangements || "—"}
+              </p>
+            </div>
           </div>
         </motion.div>
 
         {/* TEAM MEMBERS */}
-        <motion.div className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-base font-semibold mb-4 border-b pb-2">Team Members / ٹیم ممبرز</h2>
-          {ptw.team_members?.length ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {ptw.team_members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 border rounded-xl p-3 hover:shadow-sm transition">
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{m.name}</div>
-                    <div className="text-xs text-slate-500">ID: {m.id}</div>
-                  </div>
-                </div>
-              ))}
+        <motion.div
+          className="rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center justify-between gap-3 px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-white">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-1.5 rounded-full bg-purple-500" />
+              <div>
+                <h2 className="text-base font-semibold text-slate-800">
+                  Team Members <span className="text-slate-400 font-normal">/ ٹیم ممبرز</span>
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Personnel assigned to this permit
+                </p>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-slate-500">No team members added.</p>
-          )}
+            {ptw.team_members?.length ? (
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                {ptw.team_members.length} member{ptw.team_members.length > 1 ? "s" : ""}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="p-6">
+            {ptw.team_members?.length ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {ptw.team_members.map((m) => (
+                  <div
+                    key={m.id}
+                    className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-all hover:border-purple-300 hover:bg-purple-50/30 hover:shadow-sm"
+                  >
+                    <div className="shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-sm font-semibold">
+                      {m.name?.trim()?.[0]?.toUpperCase() || "?"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800 truncate">
+                        {m.name}
+                      </p>
+                      <p className="text-[11px] text-slate-500">ID: {m.id}</p>
+                    </div>
+                    <Users className="w-4 h-4 text-slate-300 group-hover:text-purple-400 transition-colors shrink-0" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 text-center py-4">
+                No team members added.
+              </p>
+            )}
+          </div>
         </motion.div>
 
-        {/* EVIDENCE */}
+              {/* EVIDENCE */}
         <motion.div className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-base font-semibold mb-4 border-b pb-2">Evidence Photos / شواہد</h2>
+
           {ptw.evidences?.length ? (
-            <div className="flex flex-wrap gap-4">
-              {ptw.evidences.map((e) => (
-                <div key={e.id} className="w-32">
-                  <img src={storageUrl(e.file_path)} alt={e.type} className="w-32 h-28 object-cover border rounded-lg shadow-sm hover:scale-105 transition" />
-                  <p className="text-[11px] text-center mt-1 text-slate-600">{e.type.replaceAll("_", " ")}</p>
+            (() => {
+              // Group evidences by their `type` label
+              const grouped = ptw.evidences.reduce<Record<string, typeof ptw.evidences>>(
+                (acc, ev) => {
+                  const key = ev.type || "UNLABELED";
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(ev);
+                  return acc;
+                },
+                {},
+              );
+              const tabs = Object.keys(grouped);
+              const activeTab = evidenceTab && grouped[evidenceTab] ? evidenceTab : tabs[0];
+              const items = grouped[activeTab] || [];
+
+              return (
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* LEFT SIDEBAR */}
+                  <aside className="md:w-56 md:shrink-0 border rounded-xl bg-slate-50/60 p-2 md:max-h-[420px] md:overflow-y-auto">
+                    <p className="px-2 pt-1 pb-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
+                      Categories
+                    </p>
+                    <ul className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
+                      {tabs.map((tab) => {
+                        const isActive = tab === activeTab;
+                        return (
+                          <li key={tab} className="shrink-0 md:shrink">
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceTab(tab)}
+                              className={`w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                isActive
+                                  ? "bg-blue-600 text-white shadow-sm"
+                                  : "text-slate-700 hover:bg-slate-200/70"
+                              }`}
+                            >
+                              <span className="truncate">{tab.replaceAll("_", " ")}</span>
+                              <span
+                                className={`shrink-0 px-1.5 py-0.5 rounded-full text-[10px] ${
+                                  isActive ? "bg-white/25 text-white" : "bg-white text-slate-600 border"
+                                }`}
+                              >
+                                {grouped[tab].length}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </aside>
+
+                  {/* RIGHT CONTENT */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {activeTab.replaceAll("_", " ")}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {items.length} image{items.length > 1 ? "s" : ""}
+                      </p>
+                    </div>
+
+                    {items.length ? (
+                      <div className="flex flex-wrap gap-4">
+                        {items.map((e) => (
+                          <div key={e.id} className="w-32 group">
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceViewerUrl(storageUrl(e.file_path))}
+                              className="relative w-32 h-28 border rounded-lg shadow-sm overflow-hidden cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              aria-label={`Open evidence ${e.type}`}
+                            >
+                              <img
+                                src={storageUrl(e.file_path)}
+                                alt={e.type}
+                                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              />
+                              <span className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <span className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-slate-700">
+                                  View full screen
+                                </span>
+                              </span>
+                            </button>
+                            <p className="text-[11px] text-center mt-1 text-slate-600 truncate">
+                              {e.type.replaceAll("_", " ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">No evidence available in this category.</p>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })()
           ) : (
             <p className="text-sm text-slate-500">No evidence available.</p>
           )}
         </motion.div>
 
         {/* CHECKLISTS */}
-        {(Object.keys(checklists) as Array<keyof typeof checklists>).map((key) => (
-          <motion.div key={key} className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-base font-semibold mb-4 border-b pb-2">{key.replaceAll("_", " ")} Checklist</h2>
-            <div className="grid md:grid-cols-2 gap-3">
-              {checklists[key]?.map((item) => (
-                <div key={item.id} className="flex justify-between border rounded-lg p-3 hover:bg-slate-50">
-                  <div>
-                    <p className="text-sm font-medium">{item.label_en}</p>
-                    <p className="text-xs text-slate-500" dir="rtl">{item.label_ur}</p>
-                  </div>
-                  {chip(item.value)}
-                </div>
-              ))}
+       {/* CHECKLISTS */}
+{(Object.keys(checklists) as Array<keyof typeof checklists>).map((key) => {
+  const items = checklists[key] || [];
+  const answered = items.filter((i) => i.value !== null).length;
+  const total = items.length;
+  const yesCount = items.filter((i) => i.value === "YES").length;
+  const allYes = total > 0 && yesCount === total;
+  const progressPct = total ? Math.round((answered / total) * 100) : 0;
+
+  return (
+    <motion.div
+      key={key}
+      className="rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-white">
+        <div className="flex items-center gap-3">
+          <div className={`h-8 w-1.5 rounded-full ${allYes ? "bg-emerald-500" : "bg-blue-500"}`} />
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">
+              {key.replaceAll("_", " ")} Checklist
+            </h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {answered} of {total} answered
+            </p>
+          </div>
+        </div>
+        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${allYes ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
+          {yesCount}/{total} YES
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1 bg-slate-100">
+        <div
+          className={`h-full transition-all duration-500 ${allYes ? "bg-emerald-500" : "bg-blue-500"}`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      {/* Items */}
+      <div className="grid md:grid-cols-2 gap-3 p-4 md:p-6">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="group flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-blue-300 hover:bg-blue-50/30 hover:shadow-sm"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-800 leading-snug">
+                {item.label_en}
+              </p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed" dir="rtl">
+                {item.label_ur}
+              </p>
             </div>
-          </motion.div>
+            <div className="shrink-0 mt-0.5">{chip(item.value)}</div>
+          </div>
         ))}
+        {!items.length && (
+          <p className="text-sm text-slate-500 col-span-full text-center py-4">
+            No items in this checklist.
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+})}
 
         {/* FEEDER SECTION for PDC on PTW_ISSUED */}
         {isPdcOnIssued && (
@@ -1330,22 +1809,87 @@ export default function PTWPreviewPage(): JSX.Element {
         )}
 
         {/* LOGS */}
+              {/* LOGS */}
         {logs.length > 0 && (
-          <motion.div className="border rounded-2xl bg-white p-6 shadow-md" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-base font-semibold mb-4 border-b pb-2">Activity Logs / کارروائی کی تفصیل</h2>
-            <ol className="relative border-l-2 border-blue-200 pl-6 space-y-5">
-              {logs.map((log, i) => (
-                <li key={log.id} className="relative">
-                  <span className={`absolute -left-[3.3%] top-0 flex h-5 w-5 items-center justify-center rounded-full text-white text-[10px] ${roleColor(log.role)}`}>{i + 1}</span>
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm font-semibold text-slate-800">{log.actor_name} ({log.role})</div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> {log.created_at}</div>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-700 italic">“{log.notes || "—"}”</p>
-                  <div className="text-xs text-slate-500 mt-1">Action: <b>{log.action}</b></div>
-                </li>
-              ))}
-            </ol>
+          <motion.div
+            className="rounded-2xl bg-white shadow-md border border-slate-200 overflow-hidden"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-b bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-1.5 rounded-full bg-amber-500" />
+                <div>
+                  <h2 className="text-base font-semibold text-slate-800">
+                    Activity Logs <span className="text-slate-400 font-normal">/ کارروائی کی تفصیل</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Chronological trail of all actions
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                {logs.length} {logs.length === 1 ? "entry" : "entries"}
+              </span>
+            </div>
+
+            <div className="p-6">
+              <ol className="relative">
+                {/* Vertical rail */}
+                <span className="absolute left-5 top-2 bottom-2 w-px bg-gradient-to-b from-slate-200 via-slate-200 to-transparent" />
+
+                {logs.map((log, i) => (
+                  <li key={log.id} className="relative flex gap-4 pb-6 last:pb-0">
+                    {/* Numbered badge on the rail */}
+                    <div
+                      className={`relative z-10 shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold shadow-sm ring-4 ring-white ${roleColor(
+                        log.role,
+                      )}`}
+                    >
+                      {i + 1}
+                    </div>
+
+                    {/* Card */}
+                    <div className="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-amber-300 hover:shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">
+                            {log.actor_name}
+                          </p>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full text-white ${roleColor(
+                              log.role,
+                            )}`}
+                          >
+                            {log.role}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1 shrink-0">
+                          <Clock className="w-3 h-3" />
+                          {log.created_at}
+                        </div>
+                      </div>
+
+                      {log.notes && (
+                        <p className="mt-2 text-sm text-slate-700 italic leading-relaxed border-l-2 border-slate-200 pl-3">
+                          “{log.notes}”
+                        </p>
+                      )}
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-[11px] uppercase tracking-wide text-slate-500 font-medium">
+                          Action
+                        </span>
+                        <span className="text-xs font-semibold text-slate-800">
+                          {log.action}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </motion.div>
         )}
       </div>
@@ -1373,103 +1917,103 @@ export default function PTWPreviewPage(): JSX.Element {
 
       {/* CHECKLIST MODAL (GRID) */}
       {isChecklistModalOpen && selectedAction && selectedAction.requiresChecklist && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm overflow-y-auto">
-    <div className="bg-white w-full max-w-2xl rounded-2xl p-6 shadow-xl my-8">
-      <h3 className="text-lg font-semibold mb-2">{selectedAction.label}</h3>
-      {checklistLoading ? (
-        <div className="py-10 text-center text-slate-500">Loading checklist...</div>
-      ) : (
-        <>
-          <p className="text-sm text-slate-500 mb-4">Mark each item as completed.</p>
-          <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-            {checklistItems.map((item) => (
-              <div key={item.id} className="border rounded-lg p-3 flex items-start gap-3">
-                <label className="mt-1 flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={answers[item.id] === "YES"}
-                    onChange={(e) =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [item.id]: e.target.checked ? "YES" : "NO",
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </label>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{item.label_en}</p>
-                  <p className="text-xs text-slate-500" dir="rtl">{item.label_ur}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-2xl p-6 shadow-xl my-8">
+            <h3 className="text-lg font-semibold mb-2">{selectedAction.label}</h3>
+            {checklistLoading ? (
+              <div className="py-10 text-center text-slate-500">Loading checklist...</div>
+            ) : (
+              <>
+                <p className="text-sm text-slate-500 mb-4">Mark each item as completed.</p>
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {checklistItems.map((item) => (
+                    <div key={item.id} className="border rounded-lg p-3 flex items-start gap-3">
+                      <label className="mt-1 flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={answers[item.id] === "YES"}
+                          onChange={(e) =>
+                            setAnswers((prev) => ({
+                              ...prev,
+                              [item.id]: e.target.checked ? "YES" : "NO",
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.label_en}</p>
+                        <p className="text-xs text-slate-500" dir="rtl">{item.label_ur}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
 
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Notes (optional)</label>
-            <textarea
-              className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter notes"
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">
-              Evidence Images (max 10, each ≤ 1MB)
-            </label>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 10) {
-                  toast.error("Maximum 10 images allowed.");
-                  return;
-                }
-                for (const file of files) {
-                  if (file.size > 1 * 1024 * 1024) {
-                    toast.error(`${file.name} exceeds 1MB.`);
-                    return;
-                  }
-                }
-                setEvidenceFiles(files);
-              }}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-
-            {/* ✅ Thumbnail previews */}
-            {evidenceFiles.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {evidenceFiles.map((file, idx) => (
-                  <img
-                    key={idx}
-                    src={URL.createObjectURL(file)}
-                    alt={`preview-${idx}`}
-                    className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80"
-                    onClick={() => setPreviewImageUrl(URL.createObjectURL(file))}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-2">Notes (optional)</label>
+                  <textarea
+                    className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter notes"
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
                   />
-                ))}
-              </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Evidence Images (max 10, each ≤ 1MB)
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 10) {
+                        toast.error("Maximum 10 images allowed.");
+                        return;
+                      }
+                      for (const file of files) {
+                        if (file.size > 1 * 1024 * 1024) {
+                          toast.error(`${file.name} exceeds 1MB.`);
+                          return;
+                        }
+                      }
+                      setEvidenceFiles(files);
+                    }}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+
+                  {/* ✅ Thumbnail previews */}
+                  {evidenceFiles.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {evidenceFiles.map((file, idx) => (
+                        <img
+                          key={idx}
+                          src={URL.createObjectURL(file)}
+                          alt={`preview-${idx}`}
+                          className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80"
+                          onClick={() => setPreviewImageUrl(URL.createObjectURL(file))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button variant="outline-secondary" onClick={() => setIsChecklistModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" disabled={submitting} onClick={handleConfirmChecklist}>
+                    {submitting ? "Submitting..." : "Confirm"}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
-
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline-secondary" onClick={() => setIsChecklistModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" disabled={submitting} onClick={handleConfirmChecklist}>
-              {submitting ? "Submitting..." : "Confirm"}
-            </Button>
-          </div>
-        </>
+        </div>
       )}
-    </div>
-  </div>
-)}
 
       {/* RETURN TO GRID MODAL */}
       {isReturnToGridModalOpen && (
@@ -1714,6 +2258,28 @@ export default function PTWPreviewPage(): JSX.Element {
       {gridRestorePreviewImageUrl && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80" onClick={() => setGridRestorePreviewImageUrl(null)}>
           <img src={gridRestorePreviewImageUrl} alt="Large preview" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+            {evidenceViewerUrl && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setEvidenceViewerUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={(ev) => { ev.stopPropagation(); setEvidenceViewerUrl(null); }}
+            className="absolute top-4 right-4 rounded-full p-2 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={evidenceViewerUrl}
+            alt="Evidence full screen"
+            className="max-w-full max-h-full object-contain select-none"
+            draggable={false}
+            onClick={(ev) => ev.stopPropagation()}
+          />
         </div>
       )}
     </div>
