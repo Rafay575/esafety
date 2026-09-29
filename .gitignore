@@ -15,8 +15,6 @@ yarn.lock
 package-lock.json
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -30,4 +28,4 @@ temp_interactive_push.bat
 branch_structure.json
 
 .env 
-.env.local
+.env.local.gitignore
