@@ -104,7 +104,7 @@ export const buildMenu = (): Array<Menu | "divider"> => {
   }
 
   // Admin-only items
-  if (isAdmin) {
+  if (isAdmin || isMepcoIT) {
     menu.push({
       icon: "History",
       title: "Activity",
